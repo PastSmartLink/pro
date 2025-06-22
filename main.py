@@ -65,7 +65,7 @@ async def run_adk_dossier_pipeline(match_details_input: Dict[str, Any]) -> Dict[
         logger.critical(f"ADK Pipeline cannot start. {error_msg}")
         return {"critical_outer_error": error_msg}
 
-    gemini_model = os.getenv("GEMINI_MODEL_ADK", "gemini-1.5-flash-preview-0514")
+    gemini_model = os.getenv("GEMINI_MODEL_ADK", "gemini-2.5-flash-preview-05-20")
     
     async with aiohttp.ClientSession() as http_session:
         api_semaphore = asyncio.Semaphore(int(os.getenv('API_SEMAPHORE_LIMIT', '3')))
