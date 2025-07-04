@@ -15,6 +15,8 @@ RETRYABLE_EXCEPTIONS = (
 )
 
 class PerplexityAIService:
+    VALID_MODELS = ["sonar-small-online", "sonar-medium-online"]  # List of supported models
+
     @staticmethod
     def _preprocess_json_text(text: str) -> str:
         """
@@ -104,7 +106,7 @@ class PerplexityAIService:
     )
     async def ask_async(
         messages: List[Dict[str, str]],
-        model: str = "sonar-pro",
+        model: str = "sonar-medium-online",  # Updated default model
         api_key: Optional[str] = None,
         timeout: int = 40,
         expect_json: bool = True
@@ -113,6 +115,11 @@ class PerplexityAIService:
             logger.error("API key must be provided for PerplexityAIService.")
             return {"error": "API key not configured"} if expect_json else "Error: API key not configured"
         
+        # Validate model
+        if model not in PerplexityAIService.VALID_MODELS:
+            logger.warning(f"Invalid model: {model}. Falling back to sonar-medium-online")
+            model = "sonar-medium-online"
+
         url = "https://api.perplexity.ai/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -178,6 +185,53 @@ class PerplexityAIService:
                             message_content_str = cleaned_text.strip()
                         return message_content_str
 
+            except aiohttp.ClientResponseError as e:
+                if e.status == 400 and "invalid_model" in raw_response_text.lower():
+                    logger.warning(f"Model {model} invalid. Falling back to sonar-small-online")
+                    payload["model"] = "sonar-small-online"
+                    async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as fallback_response:
+                        raw_response_text = await fallback_response.text()
+                        fallback_response.raise_for_status()
+                        result_data = json.loads(raw_response_text)
+                        choices = result_data.get('choices', [])
+                        if not choices or not isinstance(choices, list) or len(choices) == 0:
+                            logger.error(f"Malformed fallback response: no valid 'choices'. Response: '{raw_response_text[:500]}...'")
+                            raise ValueError("Malformed fallback response: no valid 'choices'.")
+                        message_obj = choices[0].get('message', {})
+                        message_content_raw = message_obj.get('content')
+                        if message_content_raw is None:
+                            logger.error(f"Malformed fallback response: no 'content'. Response: '{raw_response_text[:500]}...'")
+                            raise ValueError("Malformed fallback response: no 'content'.")
+                        message_content_str = str(message_content_raw).strip()
+                        if expect_json:
+                            processed_text = PerplexityAIService._preprocess_json_text(message_content_str)
+                            if not processed_text:
+                                logger.warning(f"Empty content after preprocessing in fallback. Original: '{message_content_str[:100]}...'")
+                                return {"error": "Empty content from AI after preprocessing in fallback"}
+                            try:
+                                parsed_data = json.loads(processed_text, strict=False)
+                                if not isinstance(parsed_data, (dict, list)):
+                                    logger.error(f"Parsed JSON in fallback is not a dict/list. Type: {type(parsed_data)}. Text: '{processed_text[:100]}...'")
+                                    return {"error": "Parsed content in fallback is not valid JSON structure (dict/list)"}
+                                logger.info(f"Successfully parsed JSON from Perplexity API in fallback. Model: sonar-small-online")
+                                return parsed_data
+                            except json.JSONDecodeError as e_json:
+                                logger.error(f"Initial JSON parse failed in fallback: {e_json}. Processed text: '{processed_text[:200]}...'")
+                                try:
+                                    return await PerplexityAIService._attempt_ai_correction(processed_text, api_key, session)
+                                except Exception as e_correction:
+                                    logger.critical(f"AI self-correction failed in fallback: {e_correction}. Original error: {e_json}. Processed text: '{processed_text[:200]}...'")
+                                    return {"error": f"Invalid JSON from AI and correction failed in fallback: {str(e_json)}"}
+                        else:
+                            logger.info(f"Returning plain text from Perplexity API in fallback. Model: sonar-small-online")
+                            if message_content_str.startswith("```") and message_content_str.endswith("```"):
+                                cleaned_text = re.sub(r'^```[a-zA-Z]*\n', '', message_content_str)
+                                cleaned_text = re.sub(r'\n```$', '', cleaned_text)
+                                message_content_str = cleaned_text.strip()
+                            return message_content_str
+                else:
+                    logger.error(f"Client response error in ask_async for model {model}: {e}. Response: '{raw_response_text[:500]}...'")
+                    raise
             except ValueError as e_val:
                 logger.error(f"Data processing error in ask_async for model {model}: {e_val}. Response: '{raw_response_text[:500]}...'")
                 return {"error": f"AI response processing error: {str(e_val)}"} if expect_json else f"Error: AI response processing error"
