@@ -60,7 +60,7 @@ class PerplexityAIService:
         # <<< FIX #1: Added "stream": False >>>
         # This is critical. By default, the API may use streaming.
         # Our code reads the response at once, so we must request a non-streaming response.
-        payload = {"model": "sonar-small-32k-online", "messages": correction_prompt, "stream": False}
+        payload = {"model": "sonar-pro", "messages": correction_prompt, "stream": False}
         
         async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
             response.raise_for_status()
