@@ -46,8 +46,9 @@ async def _internal_fetch_sentiment_for_baseline_ds(
     error_response_structure = {'error': True, 'error_detail': 'Sentiment fetch failed', 'home_sentiment_details': {}, 'away_sentiment_details': {}, 'sentiment_sources': []}
 
     async with api_semaphore:
+        # <<< FINAL FIX: Using 'llama-3-sonar-small-32k-online' for this less critical task for speed/cost. >>>
         ai_data = await PerplexityAIService.ask_async(
-            messages=messages, model="llama-3.1-sonar-small-128k-online",
+            messages=messages, model="llama-3-sonar-small-32k-online",
             api_key=perplexity_api_key, timeout=ai_call_timeout, expect_json=True
         )
         logger.debug(f"DS: Perplexity sentiment response for {gid}: {json.dumps(ai_data, indent=2)}")
@@ -67,7 +68,7 @@ async def _internal_fetch_sentiment_for_baseline_ds(
                 'factors': hs_details.get('factors', []) if isinstance(hs_details.get('factors'), list) else []
             },
             'away_sentiment_details': {
-                'score': float(asv) if asv and hsv not in ["n/a", "none", "null"] else None,
+                'score': float(asv) if asv and asv not in ["n/a", "none", "null"] else None,
                 'factors': as_details.get('factors', []) if isinstance(as_details.get('factors'), list) else []
             },
             'sentiment_sources': [s for s in ai_data.get('sentiment_sources', []) if isinstance(s, dict) and 'name' in s and 'url' in s]
@@ -98,8 +99,10 @@ async def _internal_get_perplexity_prediction_ds(
     error_response_structure = {'error': True, 'error_detail': 'Prediction fetch failed', 'winner': None, 'confidence_score': None, 'predicted_score': 'N/A', 'reasoning_narrative': 'N/A', 'key_factors_list': [], 'hidden_gems': [], 'sources_list': []}
 
     async with api_semaphore:
+        # <<< FINAL FIX: Using 'sonar-pro' as confirmed by your successful test. >>>
+        # This is the most powerful and up-to-date model for this critical prediction task.
         ai_data = await PerplexityAIService.ask_async(
-            messages=messages, model="llama-3.1-sonar-large-128k-online",
+            messages=messages, model="sonar-pro",
             api_key=perplexity_api_key, timeout=ai_call_timeout, expect_json=True
         )
         logger.debug(f"DS: Perplexity prediction response for {gid}: {json.dumps(ai_data, indent=2)}")
@@ -148,8 +151,9 @@ async def _internal_fetch_news_for_baseline_ds(
     messages = [{'role': 'system', 'content': 'You are an ultra-concise sports news summarizer, outputting only plain text for the most critical match-relevant news.'}, {'role': 'user', 'content': news_prompt}]
     
     async with api_semaphore:
+        # <<< FINAL FIX: Using a fast, small model for this simple task. >>>
         news_summary = await PerplexityAIService.ask_async(
-            messages=messages, model="llama-3.1-sonar-small-128k-online",
+            messages=messages, model="llama-3-sonar-small-32k-online",
             api_key=perplexity_api_key, timeout=ai_call_timeout, expect_json=False
         )
         logger.debug(f"DS: Perplexity news response for {gid}: {news_summary}")

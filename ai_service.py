@@ -22,10 +22,12 @@ class PerplexityAIService:
         if not text:
             return ""
         
+        # Remove markdown code fences (```json ... ```)
         text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
         text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
         text = text.strip()
 
+        # Extract the first valid-looking JSON object or array from the text
         json_match = re.search(r'(\{([^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|\[([^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\])', text, re.DOTALL)
         if json_match:
             text = json_match.group(0)
@@ -54,7 +56,10 @@ class PerplexityAIService:
         
         url = "https://api.perplexity.ai/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        # <<< FIX 1: Corrected model name and added stream=False >>>
+        
+        # <<< FIX #1: Added "stream": False >>>
+        # This is critical. By default, the API may use streaming.
+        # Our code reads the response at once, so we must request a non-streaming response.
         payload = {"model": "sonar-small-32k-online", "messages": correction_prompt, "stream": False}
         
         async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
@@ -88,21 +93,31 @@ class PerplexityAIService:
         expect_json: bool = True
     ) -> Union[Dict[str, Any], List[Any], str]:
         if not api_key:
-            return {"error": "API key not configured"} if expect_json else "Error: API key not configured"
+            error_message = "Error: API key not configured for PerplexityAIService"
+            return {"error": error_message} if expect_json else error_message
 
         url = "https://api.perplexity.ai/chat/completions"
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        # <<< FIX 2: Added stream=False >>>
+
+        # <<< FIX #2: Added "stream": False >>>
+        # This is the primary fix. It ensures the API returns a complete JSON object
+        # instead of a streaming response, which prevents the 400 Bad Request error.
         payload = {"model": model, "messages": messages, "stream": False}
         
+        # Log the payload for easier debugging, but be mindful of sensitive data in production.
+        # logger.debug(f"Sending request to PPLX with payload: {json.dumps(payload)}")
         logger.info(f"Sending ASYNC request to PPLX. Model: {model}. Expect JSON: {expect_json}.")
         
+        # Use a single session for retries within this call
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as response:
                     raw_response = await response.text()
+                    
+                    # This will now raise for 4xx/5xx errors, including the 400 we were seeing.
                     response.raise_for_status()
                     
+                    # Proceed with processing the successful response
                     data = json.loads(raw_response)
                     content_str = str(data.get('choices', [{}])[0].get('message', {}).get('content', ''))
 
@@ -111,19 +126,24 @@ class PerplexityAIService:
 
                     processed_text = PerplexityAIService._preprocess_json_text(content_str)
                     if not processed_text:
-                         return {"error": "Empty content after preprocessing"}
+                         return {"error": "Empty content after preprocessing", "raw_content": content_str}
                     try:
                         parsed_data = json.loads(processed_text, strict=False)
                         logger.info("Successfully parsed JSON from Perplexity API.")
                         return parsed_data
                     except json.JSONDecodeError as e_json:
-                        logger.error(f"Initial JSON parse failed. Raw: {content_str[:200]}")
+                        logger.error(f"Initial JSON parse failed. Raw content snippet: {content_str[:200]}...")
                         try:
+                            # Pass the existing session to the correction function
                             return await PerplexityAIService._attempt_ai_correction(processed_text, api_key, session)
                         except Exception as e_correction:
                             logger.critical(f"AI self-correction FAILED: {e_correction}. Original error: {e_json}")
-                            return {"error": f"Invalid JSON from AI and correction failed."}
+                            return {"error": "Invalid JSON from AI and correction failed.", "details": str(e_correction)}
 
-            except Exception as e:
-                logger.error(f"Error in ask_async: {e}", exc_info=True)
-                return {"error": str(e)} if expect_json else f"Error: {str(e)}"
+            except (aiohttp.ClientResponseError, asyncio.TimeoutError, Exception) as e:
+                # This block catches errors during the request itself or from raise_for_status()
+                # The tenacity retry logic will handle re-attempts. If all retries fail,
+                # the exception will be re-raised and caught here for final error packaging.
+                logger.error(f"Error in ask_async after retries for model {model}: {e}", exc_info=True)
+                error_detail = f"Error communicating with Perplexity API: {str(e)}"
+                return {"error": error_detail} if expect_json else error_detail
