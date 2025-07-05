@@ -63,7 +63,7 @@ class PerplexityAIService:
             "Accept": "application/json"
         }
         # Use a fast, capable model for syntax correction.
-        payload = {"model": "sonar-small-online", "messages": correction_prompt, "stream": False}
+        payload = {"model": "llama-3-sonar-small-32k-online", "messages": correction_prompt, "stream": False}
         
         async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
             response.raise_for_status()
@@ -90,7 +90,7 @@ class PerplexityAIService:
     )
     async def ask_async(
         messages: List[Dict[str, str]],
-        model: str = "sonar-small-online",
+        model: str = "llama-3-sonar-small-32k-online",
         api_key: Optional[str] = None,
         timeout: int = 40, # Increased default timeout for larger models
         expect_json: bool = True
@@ -177,4 +177,3 @@ class PerplexityAIService:
             except Exception as e_gen:
                 logger.exception(f"Unexpected non-retryable error in ask_async for model {model}. API Response Text: '{raw_response_text_for_logging}'")
                 return {"error": f"Unexpected system error: {type(e_gen).__name__}"} if expect_json else f"Unexpected system error"
-                
