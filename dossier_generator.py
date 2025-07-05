@@ -115,7 +115,7 @@ async def call_perplexity_research_tool(
         async with semaphore:
             response_data = await PerplexityAIService.ask_async(
                 messages=[{"role": "user", "content": query_string}],
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-large-32k-online",
                 api_key=api_key,
                 timeout=ai_call_timeout,
                 expect_json=False
