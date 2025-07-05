@@ -63,7 +63,7 @@ class PerplexityAIService:
             "Accept": "application/json"
         }
         # Use a fast, capable model for syntax correction.
-        payload = {"model": "llama-3.1-sonar-small-128k-online", "messages": correction_prompt}
+        payload = {"model": "llama-3.1-sonar-small-128k-online", "messages": correction_prompt, "stream": False}
         
         async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
             response.raise_for_status()
@@ -175,5 +175,6 @@ class PerplexityAIService:
                 logger.error(f"API call failed after all retries for model {model}. Last exception: {last_exception}")
                 return {"error": "AI service unavailable after multiple retries"} if expect_json else "Error: AI service unavailable"
             except Exception as e_gen:
-                logger.exception(f"Unexpected non-retryable error in ask_async for model {model}.")
+                logger.exception(f"Unexpected non-retryable error in ask_async for model {model}. API Response Text: '{raw_response_text_for_logging}'")
                 return {"error": f"Unexpected system error: {type(e_gen).__name__}"} if expect_json else f"Unexpected system error"
+                
