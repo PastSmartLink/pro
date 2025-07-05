@@ -105,7 +105,7 @@ class PerplexityAIService:
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        payload = {"model": model, "messages": messages}
+        payload = {"model": model, "messages": messages, "stream": False}
         
         logger.info(f"Sending ASYNC request to Perplexity API. Model: {model}. Expect JSON: {expect_json}. Messages: {len(messages)}")
         raw_response_text_for_logging = "No response text captured."
