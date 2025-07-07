@@ -1,3 +1,4 @@
+# adk_sportsomegapro/plans/dossier_plan.py - FINAL CORRECTED VERSION
 import logging
 import json 
 from typing import Dict, Any, List
@@ -6,20 +7,21 @@ logger = logging.getLogger("DossierGenerationPlan")
 
 class DossierGenerationPlan:
     def __init__(self):
+        # FIX: The stage names now match your frontend-compatible environment variable names
         self.csmp_stages_flow: List[tuple] = [
             ("ChiefScoutAgent", "stage_2_initial_analysis"),
             ("ChiefScoutAgent", "stage_3_news_synthesis"),
-            ("ResearchOrchestratorAgent", "stage_4_question_generation"),
-            ("ResearchOrchestratorAgent", "stage_5_research_execution"),
-            ("ResearchOrchestratorAgent", "stage_6_finding_integration"),
-            ("ChiefScoutAgent", "stage_7_narrative_synthesis"),
+            ("ResearchOrchestratorAgent", "stage_4_supergrok_inquiry"),
+            ("ResearchOrchestratorAgent", "stage_5_perplexity_research"),
+            ("ResearchOrchestratorAgent", "stage_6_findings_integration"),
+            ("ChiefScoutAgent", "stage_7_narrative_generation"),
             ("ChiefScoutAgent", "stage_8_hidden_gems"),
             ("ChiefScoutAgent", "stage_8_5_alternative_perspectives"),
-            ("ChiefScoutAgent", "stage_8_6_red_team_analysis"),
+            ("ChiefScoutAgent", "stage_8_6_red_team_counter_narrative"), # Aligned to match env var
             ("ChiefScoutAgent", "stage_9_5_dossier_structuring_make_super_prompt"),
-            ("ChiefScoutAgent", "stage_10_refinement_and_scoring"),
+            ("ChiefScoutAgent", "stage_10_refinement"), # Aligned to match env var
             ("ChiefScoutAgent", "stage_10_5_score_prediction"),
-            ("ChiefScoutAgent", "stage_11_self_optimization"),
+            ("ChiefScoutAgent", "stage_11_prompt_self_optimization"), # Aligned to match env var
             ("ChiefScoutAgent", "stage_12_first_principles_validation"),
             ("ChiefScoutAgent", "stage_13_cross_domain_mapping"),
             ("ChiefScoutAgent", "stage_14_visualization_hypothesis"),
