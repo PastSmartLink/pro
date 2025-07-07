@@ -1,8 +1,8 @@
+# pro/dossier_generator.py
 import asyncio
 import json
 import logging
 import os
-import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union, cast
 
@@ -238,7 +238,6 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         if conf:
             md.append(f"- {status_emojis['confidence']} **Win Probability:** {team_a} Win: {conf.get('team_a_win_percent')}% | {team_b} Win: {conf.get('team_b_win_percent')}%")
     
-    # ** FINAL, CORRECT BRANDING **
     md.append(f"\n\n---\n**A Hans Johannes Schulte Production for AIOS.ICU, the Intelligence Connection Unit igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution and infinite possibilities. Try a taste at [aios.icu/generate_super_prompt](https://aios.icu/generate_super_prompt), follow @pastsmartlink on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe!**")
     
     ts_utc = datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC')
