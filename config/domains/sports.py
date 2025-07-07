@@ -15,7 +15,7 @@ SPORTS_CONFIG = {
         # Prompt templates could be further broken down by stage if main agents were more generic
     },
     "research_coordinator_agent": { # This would map to ResearchOrchestratorAgent
-        "model_name": "gemini-2.5-flash-preview-05-20",
+        "model_name": "gemini-2.5-flash",
         "persona_prompt_segment": (
             "You are a specialized research coordinator for SPORTSΩmega PRO. Your role is to identify deep, "
             "non-obvious strategic angles, define precise research queries for external tools, "
