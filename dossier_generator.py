@@ -1,4 +1,3 @@
-# adk_sportsomegapro/dossier_generator.py - FINAL PRODUCTION VERSION
 import asyncio
 import json
 import logging
@@ -36,6 +35,7 @@ def render_dossier(dossier_json: Dict[str, Any]) -> str:
 
 def _render_full_agi_dossier_to_markdown(d_json: Dict[str, Any]) -> str:
     md_parts = [_render_dossier_json_to_markdown(d_json)]
+
     md_parts.append("\n---\n# 🧠 Advanced AGI Cognitive Analysis (Stages 10-20)\n")
     md_parts.append("The following sections detail the system's meta-cognitive, strategic, and ethical reasoning processes, providing unparalleled depth and transparency.")
 
@@ -107,12 +107,46 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         logger.error("_render_dossier_json_to_markdown: Input d_json is not a dictionary.")
         return "# Error: Dossier data is invalid (not a dictionary). Cannot render."
 
-    sport_emojis_map = { "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒", "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️", "soccer_uefa_champs_league": "⚽️🏆", "soccer_italy_serie_a": "🇮🇹⚽️", "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️", "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏", "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️", "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅" }
-    section_emojis = { "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟", "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄", "complex_view": "🤯", "notes": "📝", "spyglass": "🔍" }
-    status_emojis = { "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈", "winner": "🏆", "score": "🎯", "confidence": "🧠" }
-    country_flags_map = { "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹", "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "USA": "🇺🇸", "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷", "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦", "Default": "🏳️" }
-    league_country_map = { "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain", "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France", "soccer_usa_mls": "USA", "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia" }
-    club_emojis_map = { "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool": "🦅", "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Atletico Madrid": "🦊", "Chelsea": "🦁", "Arsenal": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓", "Borussia Dortmund": "🐝", "AC Milan": "😈", "Inter Milan": "🐍", "AS Roma": "🐺", "Napoli": "🌋", "Ajax": "🛡️", "PSV Eindhoven": "⚡", "Feyenoord": "🦁", "Porto": "🐉", "Benfica": "🦅", "Sporting CP": "🦁", "Sevilla": "🦇", "Valencia": "🦇", "Villarreal": "🚤", "Leicester City": "🦊", "Everton": "🍬", "West Ham United": "⚒️", "Leeds United": "🦚", "Bayer Leverkusen": "💊", "RB Leipzig": "🐂", "Lazio": "🦅" }
+    sport_emojis_map = {
+        "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒",
+        "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️",
+        "soccer_uefa_champs_league": "⚽️🏆", "soccer_italy_serie_a": "🇮🇹⚽️",
+        "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️",
+        "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏",
+        "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️",
+        "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅"
+    }
+    section_emojis = {
+        "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟",
+        "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄",
+        "complex_view": "🤯", "notes": "📝", "spyglass": "🔍"
+    }
+    status_emojis = {
+        "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈",
+        "winner": "🏆", "score": "🎯", "confidence": "🧠"
+    }
+    country_flags_map = {
+        "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹",
+        "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "USA": "🇺🇸",
+        "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
+        "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦",
+        "Default": "🏳️"
+    }
+    league_country_map = {
+        "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain",
+        "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France", "soccer_usa_mls": "USA",
+        "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia"
+    }
+    club_emojis_map = {
+        "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool": "🦅",
+        "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Atletico Madrid": "🦊",
+        "Chelsea": "🦁", "Arsenal": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓",
+        "Borussia Dortmund": "🐝", "AC Milan": "😈", "Inter Milan": "🐍", "AS Roma": "🐺", "Napoli": "🌋",
+        "Ajax": "🛡️", "PSV Eindhoven": "⚡", "Feyenoord": "🦁", "Porto": "🐉", "Benfica": "🦅",
+        "Sporting CP": "🦁", "Sevilla": "🦇", "Valencia": "🦇", "Villarreal": "🚤",
+        "Leicester City": "🦊", "Everton": "🍬", "West Ham United": "⚒️", "Leeds United": "🦚",
+        "Bayer Leverkusen": "💊", "RB Leipzig": "🐂", "Lazio": "🦅"
+    }
 
     def get_flag(team_name: str, sport_key: str) -> str:
         if sport_key in league_country_map:
@@ -121,10 +155,18 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
             country = team_name
         return country_flags_map.get(country, country_flags_map["Default"])
 
-    if "error" in d_json and not any(key in d_json for key in ["executive_summary_narrative", "team_overviews", "overall_prediction"]):
+    is_error_report = False
+    if "error" in d_json:
+        if not any(key in d_json for key in ["executive_summary_narrative", "team_overviews", "overall_prediction"]):
+            is_error_report = True
+
+    if is_error_report:
         err_title = d_json.get('match_title', 'Dossier Generation Error Report')
         err_msg = d_json.get('error', 'Unknown error during dossier generation.')
-        return "\n".join([f"# {sport_emojis_map.get('generic_sport')} Ωmega Scouting Dossier: {err_title}", f"## Generation Status: FAILED ☠️", f"**Error Detail:** {err_msg}\n"])
+        md_error = [f"# {sport_emojis_map.get('generic_sport')} Ωmega Scouting Dossier: {err_title}",
+                    f"## Generation Status: FAILED ☠️",
+                    f"**Error Detail:** {err_msg}\n"]
+        return "\n".join(md_error)
 
     md = []
     sport_key = d_json.get('sport_key', 'generic_sport')
@@ -143,36 +185,44 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     md.append(f"# {sport_emoji} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{club_a}{flag_a} {team_a} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_b}{flag_b} {team_b}")
     md.append(f"### 🗓️ <small>{match_title}</small>\n")
 
-    md.append(f"## {section_emojis['summary']} Executive Summary & Narrative\n{d_json.get('executive_summary_narrative', '*Not generated.*')}\n")
+    summary = d_json.get('executive_summary_narrative', '*Executive summary was not generated.*')
+    md.append(f"## {section_emojis['summary']} Executive Summary & Narrative\n{summary}\n")
 
     teams = d_json.get("team_overviews", [])
     if teams:
         md.append(f"## {section_emojis['teams']} Team Overviews")
         for team in teams:
             team_name = team.get('team_name', 'N/A')
-            md.append(f"\n### {club_emojis_map.get(team_name, '')}{get_flag(team_name, sport_key)} {team_name}")
+            team_flag = get_flag(team_name, sport_key)
+            team_club = club_emojis_map.get(team_name, "")
+            md.append(f"\n### {team_club}{team_flag} {team_name}")
             md.append(f"- **Status & Odds**: {team.get('status_and_odds','N/A')}")
             md.append(f"- {status_emojis['motivation']} **Motivation**: {team.get('motivation','N/A')}")
             md.append(f"- {status_emojis['dynamics']} **Recent Dynamics**: {team.get('recent_dynamics','N/A')}")
             md.append(f"- **Valuation Summary**: {team.get('valuation_summary','N/A')}")
-            if team.get("key_strengths"): md.append(f"- {status_emojis['strength']} **Key Strengths**: {'; '.join(team.get('key_strengths', []))}")
-            if team.get("key_concerns"): md.append(f"- {status_emojis['concern']} **Key Concerns**: {'; '.join(team.get('key_concerns', []))}")
+            strengths = team.get("key_strengths", [])
+            concerns = team.get("key_concerns", [])
+            if strengths: md.append(f"- {status_emojis['strength']} **Key Strengths**: {'; '.join(strengths)}")
+            if concerns: md.append(f"- {status_emojis['concern']} **Key Concerns**: {'; '.join(concerns)}")
 
-    if d_json.get('tactical_analysis_battlegrounds'): md.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds\n{d_json.get('tactical_analysis_battlegrounds')}\n")
+    tactics = d_json.get('tactical_analysis_battlegrounds')
+    if tactics: md.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds\n{tactics}\n")
 
     players = d_json.get("key_players_to_watch", [])
     if players:
         md.append(f"## {section_emojis['players']} Key Players to Watch")
         for player in players:
             p_team = player.get('team_name', 'N/A')
-            md.append(f"\n- ⭐ **{get_flag(p_team, sport_key)} {player.get('player_name', 'N/A')} ({p_team})**")
+            p_flag = get_flag(p_team, sport_key)
+            md.append(f"\n- ⭐ **{p_flag} {player.get('player_name', 'N/A')} ({p_team})**")
 
     injuries = d_json.get("injury_report_impact", [])
     if injuries:
         md.append(f"\n## {section_emojis['injury']} Injury Report Impact")
         for injury in injuries:
             i_team = injury.get('team_name','N/A')
-            md.append(f"- **{get_flag(i_team, sport_key)} {injury.get('player_name','N/A')} ({i_team})**: {injury.get('impact_summary','...')}")
+            i_flag = get_flag(i_team, sport_key)
+            md.append(f"- **{i_flag} {injury.get('player_name','N/A')} ({i_team})**: {injury.get('impact_summary','...')}")
 
     gems = d_json.get("game_changing_factors_hidden_gems",[])
     if gems:
