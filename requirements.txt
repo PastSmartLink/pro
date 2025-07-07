@@ -1,4 +1,3 @@
-isaiohappyeyeballs
 aiohttp
 aiosignal
 annotated-types
