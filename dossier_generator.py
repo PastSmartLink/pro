@@ -1,5 +1,3 @@
-# adk_sportsomegapro/dossier_generator.py
-
 import asyncio
 import json
 import logging
