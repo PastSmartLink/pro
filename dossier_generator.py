@@ -89,7 +89,8 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Chelsea FC": "🦁",
         "Arsenal FC": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓","Atletico Madrid": "🐻",
         "Oklahoma City Thunder": "🌩️", "Indiana Pacers": "🏎️", 
-        "Boston Celtics": "🍀", "Los Angeles Lakers": "🏆", "Golden State Warriors": "🌉"
+        "Boston Celtics": "🍀", "Los Angeles Lakers": "🏆", "Golden State Warriors": "🌉",
+        "New York Yankees": "🗽", "Seattle Mariners": "⚓"
     }
 
     def get_flag_or_sport_icon(team_name: str, sport_key: str) -> str:
@@ -100,7 +101,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         if team_name in country_flags_map:
             return country_flags_map[team_name]
         
-        if sport_key == "basketball_nba":
+        if sport_key == "baseball_mlb":
             return sport_emojis_map.get(sport_key, sport_emojis_map["generic_sport"])
         
         return sport_emojis_map.get(sport_key, country_flags_map["Default"])
@@ -187,9 +188,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     club_emoji_a_icon = club_emojis_map.get(team_a_name_title, "")
     club_emoji_b_icon = club_emojis_map.get(team_b_name_title, "")
     
+    # Combine dossier title and matchup for stronger visual impact
     teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} **VS** {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
-
-    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier {section_emojis['spyglass']}\n{teams_part_for_title}")
+    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier: {teams_part_for_title} {section_emojis['spyglass']}")
+    md_render.append(f"{'=' * (len(teams_part_for_title) + 10)}")  # Add underline for emphasis
     if league_date_part_info:
         md_render.append(f"### 🗓️ <small>{league_date_part_info}</small>\n")
     else:
@@ -382,17 +384,31 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
 
     md_render.append(f"\n\n## {section_emojis.get('complex_view', '🤯')} The Ωmega Perspective: Embracing Complexity")
     md_render.append(
-        "The Manna Maker Cognitive Factory’s 20-stage AGI revolution, is designed to explore multiple analytical pathways. "
+        "The Manna Maker Cognitive Factory’s 20-stage AGI revolution is designed to explore multiple analytical pathways. "
         "Different inputs or even the nuanced generative paths of our advanced AI can yield distinct, yet equally insightful, strategic "
-        "viewpoints on the same matchup. This dossier, including its primary analysis and any alternative perspectives presented, "
-        "showcases this capability, offering a richer, more comprehensive understanding than a single deterministic forecast."
-        "Try a taste at [**aios.icu/generate_super_prompt**](https://aios.icu/generate_super_prompt), follow [@pastsmartlink](https://x.com/pastsmartlink) on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe! "
+        "viewpoints on the same matchup."
     )
-
-    md_render.append(f"\n\n---\n")
-    md_render.append(f"**Hans Johannes Schulte** Production for **AIOS.ICU** (**A**rtificial **I**ntelligence **O**perating **S**ystem **I**ntelligence **C**onnection **U**nit), igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution.")
-    md_render.append(f"\n*System: The Manna Maker Engine*")
-    md_render.append(f"\n*Creator's Specializations: AI Pipeline Architect | Generative AI Solutions Developer | LLM Application Specialist | Automated Intelligence Systems Designer*")
+    md_render.append(
+        "This dossier, including its primary analysis and any alternative perspectives presented, showcases this capability, "
+        "offering a richer, more comprehensive understanding than a single deterministic forecast."
+    )
+    md_render.append("\n### Join the Revolution")
+    md_render.append(
+        "- **Try a taste**: [aios.icu/generate_super_prompt](https://aios.icu/generate_super_prompt)  \n"
+        "- **Follow**: [@pastsmartlink](https://x.com/pastsmartlink) on X  \n"
+        "- **Get Involved**: Grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250–$1,500/year, and dominate the $100M+ Manna universe!"
+    )
+    md_render.append("\n---\n")
+    md_render.append(
+        "**Hans Johannes Schulte** Production for **AIOS.ICU** (**A**rtificial **I**ntelligence **O**perating **S**ystem **I**ntelligence **C**onnection **U**nit), "
+        "igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution."
+    )
+    md_render.append("\n**System**: The Manna Maker Engine")
+    md_render.append("\n**Creator's Specializations**:")
+    md_render.append("- AI Pipeline Architect")
+    md_render.append("- Generative AI Solutions Developer")
+    md_render.append("- LLM Application Specialist")
+    md_render.append("- Automated Intelligence Systems Designer")
     
     ts_utc_str = datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC') 
     prov_info = d_json.get("provenance", {})
