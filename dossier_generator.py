@@ -1,4 +1,3 @@
-# pro/dossier_generator.py
 import asyncio
 import json 
 import logging
@@ -9,9 +8,6 @@ from typing import Dict, List, Optional, Any, Union, cast
 
 logger = logging.getLogger(__name__)
 
-# Ensure ai_service is importable from this location
-# from ai_service import PerplexityAIService # Usually imported where needed or passed
-
 async def call_perplexity_research_tool(
     query_string: str, 
     api_key: str, 
@@ -19,7 +15,7 @@ async def call_perplexity_research_tool(
     ai_call_timeout: int = 30, 
 ) -> str:
     try:
-        from ai_service import PerplexityAIService # Local import for clarity of dependency
+        from ai_service import PerplexityAIService
     except ImportError:
         logger.critical("CRITICAL: ai_service.py or PerplexityAIService not found for call_perplexity_research_tool.")
         return "Error: PerplexityAIService dependency not met."
@@ -30,13 +26,12 @@ async def call_perplexity_research_tool(
         return "Error: PPLX API Key not configured for research."
     
     try:
-        # Corrected: Using keyword arguments for all optional params of ask_async
         response_data = await PerplexityAIService.ask_async(
             messages=[{"role": "user", "content": query_string}],
             model="sonar-pro", 
             api_key=api_key,
-            timeout=ai_call_timeout,      # Keyword arg
-            expect_json=False             # Keyword arg
+            timeout=ai_call_timeout,
+            expect_json=False
         )
         if isinstance(response_data, dict) and response_data.get("error"):
             return f"Error: Perplexity API call failed: {response_data.get('error')}"
@@ -54,7 +49,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         logger.error("_render_dossier_json_to_markdown: Input d_json is not a dictionary.")
         return "# Error: Dossier data is invalid (not a dictionary). Cannot render."
     
-    # --- EMOJI DEFINITIONS (Expanded) ---
+    # --- EMOJI DEFINITIONS ---
     sport_emojis_map = {
         "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒",
         "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️", 
@@ -73,9 +68,9 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈",
         "winner": "🏆", "score": "🎯", "confidence": "🧠"
     }
-    country_flags_map = { # More comprehensive
+    country_flags_map = {
         "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹",
-        "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "United Kingdom": "🇬🇧", # Alias for EPL context
+        "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "United Kingdom": "🇬🇧",
         "USA": "🇺🇸", "United States": "🇺🇸",
         "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
         "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦",
@@ -83,56 +78,43 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         "Switzerland": "🇨🇭", "Austria": "🇦🇹", "Poland": "🇵🇱", "Turkey": "🇹🇷",
         "Default": "🏳️" 
     }
-    league_country_map = { # Associates domestic league sport_key with its primary country
+    league_country_map = {
         "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain",
         "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France",
-        "soccer_usa_mls": "USA", # Or could be more nuanced for Canadian teams in MLS
+        "soccer_usa_mls": "USA",
         "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia"
     }
-    club_emojis_map = { # Expand this with club name : emoji pairs
+    club_emojis_map = {
         "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool FC": "🦅",
         "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Chelsea FC": "🦁",
         "Arsenal FC": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓","Atletico Madrid": "🐻",
-        # NBA Teams (example, many teams don't have clear emoji, could use city symbols or be omitted)
         "Oklahoma City Thunder": "🌩️", "Indiana Pacers": "🏎️", 
         "Boston Celtics": "🍀", "Los Angeles Lakers": "🏆", "Golden State Warriors": "🌉"
     }
 
     def get_flag_or_sport_icon(team_name: str, sport_key: str) -> str:
-        # 1. Check if it's a domestic league from league_country_map
         if sport_key in league_country_map:
             country_name = league_country_map[sport_key]
             return country_flags_map.get(country_name, country_flags_map["Default"])
         
-        # 2. Check if the team_name itself is a known country (for national team matches)
         if team_name in country_flags_map:
             return country_flags_map[team_name]
         
-        # 3. Special handling for sports like NBA where teams aren't national but could have city/sport icons
         if sport_key == "basketball_nba":
-            # Could add logic here for specific city/team icons if you had them mapped
-            # For now, returns sport-specific emoji or a generic if that's missing
             return sport_emojis_map.get(sport_key, sport_emojis_map["generic_sport"])
         
-        # 4. Fallback: generic sport icon or default flag
         return sport_emojis_map.get(sport_key, country_flags_map["Default"])
 
-
-    is_error_report = False # Initial assumption
+    is_error_report = False
     if "error" in d_json and not any(key in d_json for key in ["executive_summary_narrative", "team_overviews", "overall_prediction"]):
         is_error_report = True
 
     if is_error_report:
-        # Error report rendering logic - keeping it concise here as it was okay before
         err_title_detail = d_json.get('match_title', 'Dossier Generation Error Report')
         md_error_render = [f"# {sport_emojis_map.get('generic_sport')} Ωmega Scouting Dossier: Error Report",
                            f"## Match: {err_title_detail}",
                            f"## Generation Status: FAILED ☠️",
                            f"**Error Detail:** {d_json.get('error', 'Unknown error.')}\n"]
-        # ... (add other error details as before: exec_summary_partial, debug_info, raw_response, plan_exec_log)
-        # This part is assumed to be correctly implemented from previous versions.
-        # For brevity, I am not re-pasting the full error rendering here again.
-        # Ensure it matches the complete one from the previous time if needed.
         exec_summary_partial = d_json.get('executive_summary_narrative') 
         debug_info_detail = d_json.get('debug_info')
         raw_response_detail = d_json.get('raw_response_snippet')
@@ -159,12 +141,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
                     md_error_render.append(f"- {str(note_item)}")
             md_error_render.append("\n")
         
-        # Footer for error report
         md_error_render.append(f"\n---\n**A Hans Johannes Schulte Production for SPORTSΩmegaPRO²**")
         md_error_render.append(f"\n*System: The Manna Maker Engine*")
         md_error_render.append(f"\n*Generated on {datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC')}*")
         return "\n".join(md_error_render)
-
 
     # --- Main Dossier Rendering ---
     md_render = []
@@ -176,45 +156,40 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     team_a_name_title = baseline_data.get("team_a_name_official") 
     team_b_name_title = baseline_data.get("team_b_name_official")
     
-    league_date_part_info = "" # Initialize
-    
-    # Refined parsing for team names if not in baseline_data, and for league/date
+    league_date_part_info = ""
     if not team_a_name_title or not team_b_name_title or match_title_full == 'N/A':
         if match_title_full != 'N/A':
-            # Try to parse team names and league/date from match_title_full
             match_title_regex = re.match(r"^(.*?)\s*vs\.?\s*(.*?)\s*(?:\((.*)\))?$", match_title_full, re.IGNORECASE)
             if match_title_regex:
                 if not team_a_name_title: team_a_name_title = match_title_regex.group(1).strip()
                 if not team_b_name_title: team_b_name_title = match_title_regex.group(2).strip()
-                if match_title_regex.group(3): # If league/date part was captured
+                if match_title_regex.group(3):
                     league_date_info_raw = match_title_regex.group(3).strip()
-                    # Try to split league and date if possible (e.g. "League - Date")
                     league_date_split = re.match(r"^(.*?)\s*-\s*(.*?)$", league_date_info_raw)
                     if league_date_split:
                         league_name_parsed = league_date_split.group(1).strip()
                         date_parsed = league_date_split.group(2).strip()
                         league_date_part_info = f"({league_name_parsed} - {date_parsed})"
                     else:
-                        league_date_part_info = f"({league_date_info_raw})" # Use raw if no '-'
-            else: # Fallback if main regex fails
+                        league_date_part_info = f"({league_date_info_raw})"
+            else:
                  if not team_a_name_title: team_a_name_title = "Team A"
                  if not team_b_name_title: team_b_name_title = "Team B"
                  if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("("):]
                  else: league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
-        else: # If match_title_full is 'N/A'
+        else:
             if not team_a_name_title: team_a_name_title = "Team A"
             if not team_b_name_title: team_b_name_title = "Team B"
             league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
-
 
     flag_a_icon = get_flag_or_sport_icon(team_a_name_title, sport_key_data)
     flag_b_icon = get_flag_or_sport_icon(team_b_name_title, sport_key_data)
     club_emoji_a_icon = club_emojis_map.get(team_a_name_title, "")
     club_emoji_b_icon = club_emojis_map.get(team_b_name_title, "")
     
-    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
+    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} **VS** {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
 
-    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{teams_part_for_title}")
+    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier {section_emojis['spyglass']}\n{teams_part_for_title}")
     if league_date_part_info:
         md_render.append(f"### 🗓️ <small>{league_date_part_info}</small>\n")
     else:
@@ -229,14 +204,16 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     if time_info_iso:
         try:
             dt_obj = datetime.fromisoformat(str(time_info_iso).replace("Z", "+00:00"))
-            time_formatted = dt_obj.strftime('%B %d, %Y %I:%M %p %Z') # Format without UTC offset for cleaner look if already specified
+            if dt_obj.tzinfo is None:
+                dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+            time_formatted = dt_obj.strftime('%B %d, %Y %I:%M %p UTC')
             extra_header_info.append(f"**⏱️ Kick-off:** {time_formatted}")
         except (ValueError, TypeError) as e_time:
             logger.warning(f"Could not parse dossier timestamp '{time_info_iso}': {e_time}")
             extra_header_info.append(f"**⏱️ Kick-off:** {str(time_info_iso)}")
     
     if extra_header_info:
-        md_render.append(" \\\n".join(extra_header_info) + "\n---\n") # Using backslash for hard line break in Markdown
+        md_render.append(" \\\n".join(extra_header_info) + "\n---\n")
     
     exec_summary_render = d_json.get('executive_summary_narrative','*Executive summary not available or generation incomplete.*')
     if exec_summary_render == "##PLACEHOLDER_FOR_STAGE_7_NARRATIVE##":
@@ -266,32 +243,30 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
             md_render.append(f"- **Valuation Summary**: {team_item.get('valuation_summary','N/A')}")
             
             strengths_list = team_item.get("key_strengths", []) 
-            if isinstance(strengths_list, list) and strengths_list and not all("Derived Strength" in str(s) for s in strengths_list): # Ensure s is str for "in"
+            if isinstance(strengths_list, list) and strengths_list and not all("Derived Strength" in str(s) for s in strengths_list):
                 md_render.append(f"- {status_emojis['strength']} **Key Strengths**: {'; '.join(map(str,strengths_list))}")
             else:
                 md_render.append(f"- {status_emojis['strength']} **Key Strengths**: *[Pending Full AI Derivation]*")
 
             concerns_list = team_item.get("key_concerns", []) 
-            if isinstance(concerns_list, list) and concerns_list and not all("Derived Concern" in str(c) for c in concerns_list): # Ensure c is str for "in"
+            if isinstance(concerns_list, list) and concerns_list and not all("Derived Concern" in str(c) for c in concerns_list):
                 md_render.append(f"- {status_emojis['concern']} **Key Concerns**: {'; '.join(map(str,concerns_list))}")
             else:
                 md_render.append(f"- {status_emojis['concern']} **Key Concerns**: *[Pending Full AI Derivation]*")
     
-    tactical_analysis_content_from_json = d_json.get('tactical_analysis_battlegrounds') # Use a distinct variable
+    tactical_analysis_content_from_json = d_json.get('tactical_analysis_battlegrounds')
     if tactical_analysis_content_from_json and isinstance(tactical_analysis_content_from_json, str) and \
        tactical_analysis_content_from_json != "##PLACEHOLDER_FOR_STAGE_7_NARRATIVE_TACTICAL_EXPANSION##":
-        # Check if it's genuinely different from summary, or if summary was a placeholder
         is_summary_placeholder = exec_summary_render == "*Executive summary narrative generation was incomplete.*" or \
                                  exec_summary_render == "*Executive summary not available or generation incomplete.*"
         if tactical_analysis_content_from_json.strip() != exec_summary_render.strip() or is_summary_placeholder:
             md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n{tactical_analysis_content_from_json}\n")
-        else: # It was identical to a non-placeholder summary
+        else:
             md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis section was a duplicate of the executive summary. Specific tactical content may be pending or was not distinctly generated.]*\n")
-    elif tactical_analysis_content_from_json: # It's a placeholder
+    elif tactical_analysis_content_from_json:
          md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis pending full AI derivation.]*\n")
-    else: # It's not present or None
+    else:
         md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis not available.]*\n")
-
 
     key_players_data = d_json.get("key_players_to_watch", []) 
     if isinstance(key_players_data, list) and key_players_data and not (len(key_players_data)==1 and isinstance(key_players_data[0],dict) and key_players_data[0].get("player_name")=="[PlayerName]"):
@@ -338,7 +313,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     default_gem_texts = ["(No distinct hidden gems identified", "(Hidden gems data issue", "(Default: Hidden gems processing", "[Derive"]
     is_real_gems_data = False
     if isinstance(gems_data, list) and gems_data: 
-        for gem_item_check in gems_data: # Iterate through all gems to find at least one real one
+        for gem_item_check in gems_data:
             if isinstance(gem_item_check, dict):
                 detail_text_check = gem_item_check.get("detail_explanation","")
                 if isinstance(detail_text_check, str) and not any(marker in detail_text_check for marker in default_gem_texts):
@@ -351,16 +326,14 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
              if isinstance(gem_item,dict):
                  gem_title_text = gem_item.get('factor_title','Gem')
                  gem_detail_text = gem_item.get('detail_explanation','N/A')
-                 # Filter out placeholder/default text for display
                  if not isinstance(gem_detail_text, str) or gem_detail_text == "N/A" or any(dt in gem_detail_text for dt in default_gem_texts):
                      continue 
                  md_render.append(f"\n- 💡 **{gem_title_text}:** {gem_detail_text} (Impact: {gem_item.get('impact_on_game','[Derive Impact]')}, Basis: {gem_item.get('supporting_data_type','[Derive Data Type]')})")
-    elif gems_data: # If gems_data list exists but was filtered out, mention it
+    elif gems_data:
         md_render.append(f"\n## {section_emojis['gems']} Game-Changing Factors & Hidden Gems\n*[No distinct hidden gems were identified, or data is pending derivation.]*\n")
     
     alt_perspectives = d_json.get("alternative_perspectives", [])
     if isinstance(alt_perspectives, list) and alt_perspectives:
-        # Check if there's at least one valid perspective
         has_valid_perspective = False
         for persp_item_check in alt_perspectives:
             if isinstance(persp_item_check, dict) and persp_item_check.get('viewpoint_focus', 'Alternative Angle') != 'Alternative Angle':
@@ -375,7 +348,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
                     md_render.append(f"\n{persp_item.get('alternative_narrative_summary', '*No summary provided for this viewpoint.*')}")
                     supporting_args = persp_item.get('supporting_gems_or_arguments', [])
                     if isinstance(supporting_args, list) and supporting_args:
-                        md_render.append(f"\n  - **Key Supporting Arguments/Gems for this Viewpoint:**")
+                        md_render.append(f"\n  - **Key Supporting Arguments/Gems for this viewpoint:**")
                         for arg in supporting_args:
                             md_render.append(f"    - {str(arg)}") 
             md_render.append("\n") 
