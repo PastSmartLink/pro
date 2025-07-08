@@ -1,8 +1,8 @@
-# pro/dossier_generator.py
 import asyncio
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union, cast
 
@@ -107,46 +107,12 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         logger.error("_render_dossier_json_to_markdown: Input d_json is not a dictionary.")
         return "# Error: Dossier data is invalid (not a dictionary). Cannot render."
 
-    sport_emojis_map = {
-        "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒",
-        "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️",
-        "soccer_uefa_champs_league": "⚽️🏆", "soccer_italy_serie_a": "🇮🇹⚽️",
-        "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️",
-        "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏",
-        "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️",
-        "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅"
-    }
-    section_emojis = {
-        "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟",
-        "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄",
-        "complex_view": "🤯", "notes": "📝", "spyglass": "🔍"
-    }
-    status_emojis = {
-        "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈",
-        "winner": "🏆", "score": "🎯", "confidence": "🧠"
-    }
-    country_flags_map = {
-        "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹",
-        "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "USA": "🇺🇸",
-        "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
-        "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦",
-        "Default": "🏳️"
-    }
-    league_country_map = {
-        "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain",
-        "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France", "soccer_usa_mls": "USA",
-        "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia"
-    }
-    club_emojis_map = {
-        "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool": "🦅",
-        "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Atletico Madrid": "🦊",
-        "Chelsea": "🦁", "Arsenal": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓",
-        "Borussia Dortmund": "🐝", "AC Milan": "😈", "Inter Milan": "🐍", "AS Roma": "🐺", "Napoli": "🌋",
-        "Ajax": "🛡️", "PSV Eindhoven": "⚡", "Feyenoord": "🦁", "Porto": "🐉", "Benfica": "🦅",
-        "Sporting CP": "🦁", "Sevilla": "🦇", "Valencia": "🦇", "Villarreal": "🚤",
-        "Leicester City": "🦊", "Everton": "🍬", "West Ham United": "⚒️", "Leeds United": "🦚",
-        "Bayer Leverkusen": "💊", "RB Leipzig": "🐂", "Lazio": "🦅"
-    }
+    sport_emojis_map = { "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒", "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️", "soccer_uefa_champs_league": "⚽️🏆", "soccer_fifa_club_world_cup": "🌍🏆", "soccer_italy_serie_a": "🇮🇹⚽️", "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️", "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏", "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️", "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅" }
+    section_emojis = { "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟", "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄", "complex_view": "🤯", "notes": "📝", "spyglass": "🔍" }
+    status_emojis = { "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈", "winner": "🏆", "score": "🎯", "confidence": "🧠" }
+    country_flags_map = { "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹", "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "USA": "🇺🇸", "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷", "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦", "Default": "🏳️" }
+    league_country_map = { "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain", "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France", "soccer_usa_mls": "USA", "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia" }
+    club_emojis_map = { "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool": "🦅", "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint Germain": "🗼", "Atletico Madrid": "🦊", "Chelsea": "🦁", "Arsenal": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓", "Borussia Dortmund": "🐝", "AC Milan": "😈", "Inter Milan": "🐍", "AS Roma": "🐺", "Napoli": "🌋", "Ajax": "🛡️", "PSV Eindhoven": "⚡", "Feyenoord": "🦁", "Porto": "🐉", "Benfica": "🦅", "Sporting CP": "🦁", "Sevilla": "🦇", "Valencia": "🦇", "Villarreal": "🚤", "Leicester City": "🦊", "Everton": "🍬", "West Ham United": "⚒️", "Leeds United": "🦚", "Bayer Leverkusen": "💊", "RB Leipzig": "🐂", "Lazio": "🦅", "New England Revolution": "🇺🇸", "Inter Miami CF": "🦩", "Boston Red Sox": "⚾️", "Colorado Rockies": "🏔️", "Cincinnati Reds": "🔴", "Miami Marlins": "🐠", "Los Angeles FC": "⚽️", "Atlanta United FC": "🍑", "Toronto FC": "🍁", "Detroit Tigers": "🐯", "Tampa Bay Rays": "🌊" }
 
     def get_flag(team_name: str, sport_key: str) -> str:
         if sport_key in league_country_map:
@@ -166,15 +132,15 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     match_title = d_json.get('match_title', 'N/A')
     
     baseline = d_json.get("baseline_data", {})
-    team_a = baseline.get("team_a_name_official", "Team A")
-    team_b = baseline.get("team_b_name_official", "Team B")
+    team_a_name = baseline.get("team_a_name_official", d_json.get("input", {}).get("team_a", "Team A"))
+    team_b_name = baseline.get("team_b_name_official", d_json.get("input", {}).get("team_b", "Team B"))
     
-    flag_a = get_flag(team_a, sport_key)
-    flag_b = get_flag(team_b, sport_key)
-    club_a = club_emojis_map.get(team_a, "")
-    club_b = club_emojis_map.get(team_b, "")
+    flag_a = get_flag(team_a_name, sport_key)
+    flag_b = get_flag(team_b_name, sport_key)
+    club_a = club_emojis_map.get(team_a_name, "")
+    club_b = club_emojis_map.get(team_b_name, "")
     
-    md.append(f"# {sport_emoji} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{club_a}{flag_a} {team_a} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_b}{flag_b} {team_b}")
+    md.append(f"# {sport_emoji} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{club_a}{flag_a} {team_a_name} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_b}{flag_b} {team_b_name}")
     md.append(f"### 🗓️ <small>{match_title}</small>\n")
 
     summary = d_json.get('executive_summary_narrative', '*Executive summary was not generated.*')
@@ -184,10 +150,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     if teams:
         md.append(f"## {section_emojis['teams']} Team Overviews")
         for team in teams:
-            team_name = team.get('team_name', 'N/A')
-            team_flag = get_flag(team_name, sport_key)
-            team_club = club_emojis_map.get(team_name, "")
-            md.append(f"\n### {team_club}{team_flag} {team_name}")
+            team_name_current = team.get('team_name', 'N/A')
+            team_flag = get_flag(team_name_current, sport_key)
+            team_club = club_emojis_map.get(team_name_current, "")
+            md.append(f"\n### {team_club}{team_flag} {team_name_current}")
             md.append(f"- **Status & Odds**: {team.get('status_and_odds','N/A')}")
             md.append(f"- {status_emojis['motivation']} **Motivation**: {team.get('motivation','N/A')}")
             md.append(f"- {status_emojis['dynamics']} **Recent Dynamics**: {team.get('recent_dynamics','N/A')}")
@@ -236,9 +202,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         md.append(f"- {status_emojis['score']} **Illustrative Scoreline**: {pred.get('predicted_score_illustrative','N/A')}")
         conf = pred.get("confidence_percentage_split")
         if conf:
-            md.append(f"- {status_emojis['confidence']} **Win Probability:** {team_a} Win: {conf.get('team_a_win_percent')}% | {team_b} Win: {conf.get('team_b_win_percent')}%")
+            md.append(f"- {status_emojis['confidence']} **Win Probability:** {team_a_name} Win: {conf.get('team_a_win_percent')}% | {team_b_name} Win: {conf.get('team_b_win_percent')}%")
     
-    md.append(f"\n\n---\n**A Hans Johannes Schulte Production for AIOS.ICU, the Intelligence Connection Unit igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution and infinite possibilities. Try a taste at [aios.icu/generate_super_prompt](https://aios.icu/generate_super_prompt), follow @pastsmartlink on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe!**")
+    # ** FINAL, CORRECTED BRANDING **
+    md.append(f"\n\n---\nA Hans Johannes Schulte Production for **AIOS.ICU** (Artificial Intelligence Operating System Intelligence Connection Unit), igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution. Try a taste at [**aios.icu/generate_super_prompt**](https://aios.icu/generate_super_prompt), follow [@pastsmartlink](https://x.com/pastsmartlink) on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe!")
     
     ts_utc = datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC')
     md.append(f"\n*Generated by the Manna Maker Cognitive OS, powered by AIOS.ICU, on {ts_utc}*")
