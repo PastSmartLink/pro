@@ -177,6 +177,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     # --- Main Dossier Rendering ---
     md_render = []
 
+    # 1. BEAUTIFUL TITLE SECTION WITH IMAGE, TEAMS, DATE, TIME, VENUE
     sport_key_data = d_json.get('sport_key', 'generic_sport')
     sport_emoji_title = sport_emojis_map.get(sport_key_data, sport_emojis_map["generic_sport"])
     match_title_full = d_json.get('match_title','N/A')
@@ -184,6 +185,9 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     team_a_name_title = baseline_data.get("team_a_name_official")
     team_b_name_title = baseline_data.get("team_b_name_official")
     league_date_part_info = "" # Initialize
+    league = ""
+    country = ""
+    date_str = ""
 
     # Refined parsing for team names if not in baseline_data, and for league/date
     if not team_a_name_title or not team_b_name_title or match_title_full == 'N/A':
@@ -198,37 +202,78 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
                     # Try to split league and date if possible (e.g. "League - Date")
                     league_date_split = re.match(r"^(.*?)\s*-\s*(.*?)$", league_date_info_raw)
                     if league_date_split:
-                        league_name_parsed = league_date_split.group(1).strip()
-                        date_parsed = league_date_split.group(2).strip()
-                        league_date_part_info = f"({league_name_parsed} - {date_parsed})"
+                        league = league_date_split.group(1).strip()
+                        date_str = league_date_split.group(2).strip()
+                        league_date_part_info = f"{league} - {date_str}"
                     else:
-                        league_date_part_info = f"({league_date_info_raw})" # Use raw if no '-'
+                        league_date_part_info = f"{league_date_info_raw}" # Use raw if no '-'
             else: # Fallback if main regex fails
                 if not team_a_name_title: team_a_name_title = "Team A"
                 if not team_b_name_title: team_b_name_title = "Team B"
-                if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("("):]
-                else: league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
+                if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("(")+1:-1]
+                else: league_date_part_info = f"{sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')}"
         else: # If match_title_full is 'N/A'
             if not team_a_name_title: team_a_name_title = "Team A"
             if not team_b_name_title: team_b_name_title = "Team B"
-            league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
+            league_date_part_info = f"{sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')}"
+
+    # Extract country if possible
+    if league_date_part_info:
+        for key, val in league_country_map.items():
+            if league and league.lower() in key.lower():
+                country = val
+                break
+    
+    if not country and sport_key_data in league_country_map:
+        country = league_country_map[sport_key_data]
+    
+    if not country:
+        country = baseline_data.get("country", "")
 
     flag_a_icon = get_flag_or_sport_icon(team_a_name_title, sport_key_data)
     flag_b_icon = get_flag_or_sport_icon(team_b_name_title, sport_key_data)
     club_emoji_a_icon = club_emojis_map.get(team_a_name_title, "")
     club_emoji_b_icon = club_emojis_map.get(team_b_name_title, "")
 
-    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} VS {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
+    # Venue and time
+    venue_info = baseline_data.get("venue_name_official", d_json.get("venue"))
+    time_info_iso = baseline_data.get("commence_time_iso_official", d_json.get("input", {}).get("commence_time")) or d_json.get("commence_time_iso")
 
-    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier {section_emojis['spyglass']}{teams_part_for_title}")
+    if time_info_iso:
+        try:
+            dt_obj = datetime.fromisoformat(str(time_info_iso).replace("Z", "+00:00"))
+            if dt_obj.tzinfo is None:
+                dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+            date_str = dt_obj.strftime('%Y-%m-%d')
+        except (ValueError, TypeError):
+            date_str = str(time_info_iso)
 
-    if league_date_part_info:
-        md_render.append(f"### 🗓️ {league_date_part_info}\n")
+    # Compose new title line and info line
+    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} **VS** {club_emoji_b_icon}{flag_b_icon} {team_b_name_title} {section_emojis['spyglass']}".replace("  ", " ").strip()
+    prominent_title_line = f"# {sport_emoji_title} {teams_part_for_title}" # Ensure big, prominent title
+
+    info_line = ""
+    info_pieces = []
+    if league or country or date_str:
+        if league: info_pieces.append(league)
+        if country: info_pieces.append(country)
+        if date_str: info_pieces.append(date_str)
+        info_line = f"🗓️ ({' - '.join(info_pieces)})"
+    elif league_date_part_info:
+        info_line = f"🗓️ ({league_date_part_info})"
+    else:
+        info_line = None
+
+    # --- TITLE, IMAGE, MINI-INTRO ---
+    md_render.append(prominent_title_line)
+
+    if info_line:
+        md_render.append(f"### {info_line}\n")
     else:
         md_render.append("\n")
 
-    venue_info = baseline_data.get("venue_name_official", d_json.get("venue"))
-    time_info_iso = baseline_data.get("commence_time_iso_official", d_json.get("input", {}).get("commence_time")) or d_json.get("commence_time_iso")
+    # Add the image with correct URL
+    md_render.append("![Match Visualization](https://raw.githubusercontent.com/PastSmartLink/pro/refs/heads/main/static/Manna_Maker_Cognitive.gif)\n")
 
     extra_header_info = []
     if venue_info:
