@@ -1,213 +1,448 @@
+# adk_sportsomegapro/dossier_generator.py
 import asyncio
-import json
+import json 
 import logging
 import os
-import re
-from datetime import datetime, timezone
+import re 
+from datetime import datetime, timezone 
 from typing import Dict, List, Optional, Any, Union, cast
 
 logger = logging.getLogger(__name__)
 
-class PromptManager:
-    def __init__(self, prompt_dir: str = "prompts"):
-        self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.prompt_dir = os.path.join(self.base_path, prompt_dir)
-        if not os.path.isdir(self.prompt_dir):
-            logger.warning(f"Prompt directory '{self.prompt_dir}' not found.")
+# Ensure ai_service is importable from this location
+# from ai_service import PerplexityAIService # Usually imported where needed or passed
 
-    def get_prompt(self, stage_name: str) -> str:
-        file_path = os.path.join(self.prompt_dir, f"{stage_name}.md")
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
-        except FileNotFoundError:
-            logger.error(f"CRITICAL PROMPT ERROR: Prompt file not found at '{file_path}'.")
-            raise
+async def call_perplexity_research_tool(
+    query_string: str, 
+    api_key: str, 
+    semaphore: asyncio.Semaphore, 
+    ai_call_timeout: int = 30, 
+) -> str:
+    try:
+        from ai_service import PerplexityAIService # Local import for clarity of dependency
+    except ImportError:
+        logger.critical("CRITICAL: ai_service.py or PerplexityAIService not found for call_perplexity_research_tool.")
+        return "Error: PerplexityAIService dependency not met."
 
-def render_dossier(dossier_json: Dict[str, Any]) -> str:
-    agi_indicators = ["predictive_scenarios", "ethical_review_report", "first_principles_report"]
-    if any(key in dossier_json for key in agi_indicators):
-        logger.info("Full AGI output detected. Using advanced AGI dossier renderer.")
-        return _render_full_agi_dossier_to_markdown(dossier_json)
-    else:
-        logger.info("Standard dossier output detected. Using standard JSON renderer.")
-        return _render_dossier_json_to_markdown(dossier_json)
-
-def _render_full_agi_dossier_to_markdown(d_json: Dict[str, Any]) -> str:
-    md_parts = [_render_dossier_json_to_markdown(d_json)]
-
-    md_parts.append("\n---\n# 🧠 Advanced AGI Cognitive Analysis (Stages 10-20)\n")
-    md_parts.append("The following sections detail the system's meta-cognitive, strategic, and ethical reasoning processes, providing unparalleled depth and transparency.")
-
-    principles_report = d_json.get("first_principles_report", {})
-    if principles_report:
-        md_parts.append("\n## 🛡️ Stage 12: First Principles Validation")
-        md_parts.append("Deconstruction of the analysis to its axiomatic truths, eliminating unsafe assumptions.")
-        validated = principles_report.get("validated_principles", [])
-        if validated:
-            md_parts.append("\n**Verified Principles:**")
-            for item in validated:
-                md_parts.append(f"- ✅ {item}")
-        invalidated = principles_report.get("invalidated_assumptions", [])
-        if invalidated:
-            md_parts.append("\n**Rejected Assumptions:**")
-            for item in invalidated:
-                md_parts.append(f"- ❌ {item}")
-
-    cross_domain_report = d_json.get("cross_domain_mapping_report", {})
-    if cross_domain_report:
-        md_parts.append("\n## 🌐 Stage 13: Cross-Domain Analogical Insights")
-        md_parts.append("Identifying structurally similar problems in unrelated fields to generate novel strategies.")
-        analogues = cross_domain_report.get("analogues", [])
-        if analogues:
-            for item in analogues:
-                md_parts.append(f"- **Analogue:** `{item.get('source_domain')}` - `{item.get('analogue_description')}`")
-        hypotheses = cross_domain_report.get("novel_hypotheses", [])
-        if hypotheses:
-            md_parts.append("\n**New Hypotheses Generated:**")
-            for item in hypotheses:
-                md_parts.append(f"- 💡 {item}")
+    if not query_string or not isinstance(query_string, str):
+        return "Error: No valid query for PPLX."
+    if not api_key:
+        return "Error: PPLX API Key not configured for research."
     
-    scenarios = d_json.get("predictive_scenarios", [])
-    if scenarios:
-        md_parts.append("\n## 🎲 Stage 16: Predictive Scenario Modeling")
-        md_parts.append("Mapping the possibility space beyond a single prediction to understand multiple potential futures.")
-        for scenario in scenarios:
-            prob = scenario.get('probability', 'N/A')
-            md_parts.append(f"\n- **Scenario: \"{scenario.get('name', 'Untitled')}\" (Likelihood: {prob}%)**")
-            md_parts.append(f"  - *Narrative:* {scenario.get('narrative', '...')}")
-            md_parts.append(f"  - *Key Drivers:* {', '.join(scenario.get('drivers', []))}")
-            md_parts.append(f"  - ⚫ *Identified 'Black Swan' Event:* {scenario.get('black_swan_event', 'None identified.')}")
-
-    ethical_report = d_json.get("ethical_review_report", {})
-    if ethical_report:
-        md_parts.append("\n## ⚖️ Stage 17: Ethical Compliance Review")
-        md_parts.append("Auditing the analysis for cognitive bias, potential harm, and ethical alignment.")
-        risks = ethical_report.get("identified_risks", [])
-        if not risks:
-            md_parts.append("\n- ✅ **Compliance Status:** No significant ethical risks or biases were detected.")
-        else:
-            md_parts.append("\n**Identified Risks & Mitigations:**")
-            for risk in risks:
-                md_parts.append(f"- **Risk:** {risk.get('risk_description', 'N/A')} (Category: `{risk.get('risk_category', 'General')}`)")
-                md_parts.append(f"  - **Mitigation Applied:** {risk.get('mitigation_action', 'None.')}")
-
-    validation_report = d_json.get("final_validation_report", {})
-    if validation_report:
-        md_parts.append("\n## ✅ Stage 20: Final Validation & Quality Assurance")
-        md_parts.append("Final adversarial check and internal consistency audit.")
-        md_parts.append(f"- **Consistency Check:** {validation_report.get('internal_consistency_check', 'PENDING')}")
-        md_parts.append(f"- **Adversarial Challenge:** {validation_report.get('adversarial_challenge_summary', 'PENDING')}")
-        md_parts.append(f"- **Final Quality Score:** {validation_report.get('final_quality_score', 'N/A')}/100")
+    try:
+        # Corrected: Using keyword arguments for all optional params of ask_async
+        response_data = await PerplexityAIService.ask_async(
+            messages=[{"role": "user", "content": query_string}],
+            model="sonar-pro", 
+            api_key=api_key,
+            timeout=ai_call_timeout,      # Keyword arg
+            expect_json=False             # Keyword arg
+        )
+        if isinstance(response_data, dict) and response_data.get("error"):
+            return f"Error: Perplexity API call failed: {response_data.get('error')}"
+        if isinstance(response_data, str):
+            return response_data
         
-    return "\n".join(md_parts)
+        return f"Error: Unexpected response type from PerplexityAIService: {type(response_data)}"
+
+    except Exception as e:
+        logger.error(f"PPLX tool err for '{query_string[:30]}...': {e}", exc_info=True)
+        return f"Error: PPLX Research Error: {e}"
 
 def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     if not isinstance(d_json, dict):
         logger.error("_render_dossier_json_to_markdown: Input d_json is not a dictionary.")
         return "# Error: Dossier data is invalid (not a dictionary). Cannot render."
+    
+    # --- EMOJI DEFINITIONS (Expanded) ---
+    sport_emojis_map = {
+        "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒",
+        "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️", 
+        "soccer_uefa_champs_league": "⚽️🏆", "soccer_italy_serie_a": "🇮🇹⚽️", 
+        "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️", 
+        "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏", 
+        "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️", 
+        "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅"
+    }
+    section_emojis = {
+        "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟",
+        "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄", 
+        "complex_view": "🤯", "notes": "📝", "spyglass": "🔍"
+    }
+    status_emojis = {
+        "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈",
+        "winner": "🏆", "score": "🎯", "confidence": "🧠"
+    }
+    country_flags_map = { # More comprehensive
+        "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹",
+        "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "United Kingdom": "🇬🇧", # Alias for EPL context
+        "USA": "🇺🇸", "United States": "🇺🇸",
+        "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷",
+        "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦",
+        "Belgium": "🇧🇪", "Croatia": "🇭🇷", "Denmark": "🇩🇰", "Sweden": "🇸🇪", "Norway": "🇳🇴",
+        "Switzerland": "🇨🇭", "Austria": "🇦🇹", "Poland": "🇵🇱", "Turkey": "🇹🇷",
+        "Default": "🏳️" 
+    }
+    league_country_map = { # Associates domestic league sport_key with its primary country
+        "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain",
+        "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France",
+        "soccer_usa_mls": "USA", # Or could be more nuanced for Canadian teams in MLS
+        "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia"
+    }
+    club_emojis_map = { # Expand this with club name : emoji pairs
+        "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool FC": "🦅",
+        "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint-Germain": "🗼", "Chelsea FC": "🦁",
+        "Arsenal FC": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓","Atletico Madrid": "🐻",
+        # NBA Teams (example, many teams don't have clear emoji, could use city symbols or be omitted)
+        "Oklahoma City Thunder": "🌩️", "Indiana Pacers": "🏎️", 
+        "Boston Celtics": "🍀", "Los Angeles Lakers": "🏆", "Golden State Warriors": "🌉"
+    }
 
-    sport_emojis_map = { "basketball_nba": "🏀", "soccer_mls": "⚽️", "icehockey_nhl": "🏒", "americanfootball_nfl": "🏈", "baseball_mlb": "⚾️", "soccer_epl": "🇬🇧⚽️", "soccer_uefa_champs_league": "⚽️🏆", "soccer_fifa_club_world_cup": "🌍🏆", "soccer_italy_serie_a": "🇮🇹⚽️", "soccer_spain_la_liga": "🇪🇸⚽️", "soccer_germany_bundesliga": "🇩🇪⚽️", "soccer_france_ligue_one": "🇫🇷⚽️", "soccer_usa_mls": "🇺🇸⚽️", "cricket_ipl": "🏏", "aussierules_afl": "🏉", "soccer_netherlands_eredivisie": "🇳🇱⚽️", "soccer_uefa_nations_league": "🌍⚽️", "generic_sport": "🏅" }
-    section_emojis = { "summary": "📜", "teams": "👥", "tactics": "♟️", "players": "🌟", "injury": "🩹", "gems": "💎", "prediction": "🔮", "alt_view": "🔄", "complex_view": "🤯", "notes": "📝", "spyglass": "🔍" }
-    status_emojis = { "strength": "💪", "concern": "⚠️", "motivation": "🔥", "dynamics": "📈", "winner": "🏆", "score": "🎯", "confidence": "🧠" }
-    country_flags_map = { "Spain": "🇪🇸", "France": "🇫🇷", "Germany": "🇩🇪", "Portugal": "🇵🇹", "Netherlands": "🇳🇱", "Italy": "🇮🇹", "England": "🇬🇧", "USA": "🇺🇸", "India": "🇮🇳", "Australia": "🇦🇺", "Brazil": "🇧🇷", "Argentina": "🇦🇷", "Japan": "🇯🇵", "South Korea": "🇰🇷", "Mexico": "🇲🇽", "Canada": "🇨🇦", "Default": "🏳️" }
-    league_country_map = { "soccer_epl": "England", "soccer_italy_serie_a": "Italy", "soccer_spain_la_liga": "Spain", "soccer_germany_bundesliga": "Germany", "soccer_france_ligue_one": "France", "soccer_usa_mls": "USA", "soccer_netherlands_eredivisie": "Netherlands", "cricket_ipl": "India", "aussierules_afl": "Australia" }
-    club_emojis_map = { "Real Madrid": "👑", "FC Barcelona": "🔵🔴", "Manchester United": "👹", "Liverpool": "🦅", "Bayern Munich": "🍺", "Juventus": "🦓", "Paris Saint Germain": "🗼", "Atletico Madrid": "🦊", "Chelsea": "🦁", "Arsenal": "🔫", "Manchester City": "🌊", "Tottenham Hotspur": "🐓", "Borussia Dortmund": "🐝", "AC Milan": "😈", "Inter Milan": "🐍", "AS Roma": "🐺", "Napoli": "🌋", "Ajax": "🛡️", "PSV Eindhoven": "⚡", "Feyenoord": "🦁", "Porto": "🐉", "Benfica": "🦅", "Sporting CP": "🦁", "Sevilla": "🦇", "Valencia": "🦇", "Villarreal": "🚤", "Leicester City": "🦊", "Everton": "🍬", "West Ham United": "⚒️", "Leeds United": "🦚", "Bayer Leverkusen": "💊", "RB Leipzig": "🐂", "Lazio": "🦅", "New England Revolution": "🇺🇸", "Inter Miami CF": "🦩", "Boston Red Sox": "⚾️", "Colorado Rockies": "🏔️", "Cincinnati Reds": "🔴", "Miami Marlins": "🐠", "Los Angeles FC": "⚽️", "Atlanta United FC": "🍑", "Toronto FC": "🍁", "Detroit Tigers": "🐯", "Tampa Bay Rays": "🌊" }
-
-    def get_flag(team_name: str, sport_key: str) -> str:
+    def get_flag_or_sport_icon(team_name: str, sport_key: str) -> str:
+        # 1. Check if it's a domestic league from league_country_map
         if sport_key in league_country_map:
-            country = league_country_map[sport_key]
-        else:
-            country = team_name
-        return country_flags_map.get(country, country_flags_map["Default"])
+            country_name = league_country_map[sport_key]
+            return country_flags_map.get(country_name, country_flags_map["Default"])
+        
+        # 2. Check if the team_name itself is a known country (for national team matches)
+        if team_name in country_flags_map:
+            return country_flags_map[team_name]
+        
+        # 3. Special handling for sports like NBA where teams aren't national but could have city/sport icons
+        if sport_key == "basketball_nba":
+            # Could add logic here for specific city/team icons if you had them mapped
+            # For now, returns sport-specific emoji or a generic if that's missing
+            return sport_emojis_map.get(sport_key, sport_emojis_map["generic_sport"])
+        
+        # 4. Fallback: generic sport icon or default flag
+        return sport_emojis_map.get(sport_key, country_flags_map["Default"])
 
+
+    is_error_report = False # Initial assumption
     if "error" in d_json and not any(key in d_json for key in ["executive_summary_narrative", "team_overviews", "overall_prediction"]):
-        err_title = d_json.get('match_title', 'Dossier Generation Error Report')
-        err_msg = d_json.get('error', 'Unknown error during dossier generation.')
-        return "\n".join([f"# {sport_emojis_map.get('generic_sport')} Ωmega Scouting Dossier: {err_title}", f"## Generation Status: FAILED ☠️", f"**Error Detail:** {err_msg}\n"])
+        is_error_report = True
 
-    md = []
-    sport_key = d_json.get('sport_key', 'generic_sport')
-    sport_emoji = sport_emojis_map.get(sport_key, "🏅")
-    match_title = d_json.get('match_title', 'N/A')
+    if is_error_report:
+        # Error report rendering logic - keeping it concise here as it was okay before
+        err_title_detail = d_json.get('match_title', 'Dossier Generation Error Report')
+        md_error_render = [f"# {sport_emojis_map.get('generic_sport')} Ωmega Scouting Dossier: Error Report",
+                           f"## Match: {err_title_detail}",
+                           f"## Generation Status: FAILED ☠️",
+                           f"**Error Detail:** {d_json.get('error', 'Unknown error.')}\n"]
+        # ... (add other error details as before: exec_summary_partial, debug_info, raw_response, plan_exec_log)
+        # This part is assumed to be correctly implemented from previous versions.
+        # For brevity, I am not re-pasting the full error rendering here again.
+        # Ensure it matches the complete one from the previous time if needed.
+        exec_summary_partial = d_json.get('executive_summary_narrative') 
+        debug_info_detail = d_json.get('debug_info')
+        raw_response_detail = d_json.get('raw_response_snippet')
+        plan_exec_log = d_json.get("plan_execution_notes") or d_json.get("plan_execution_notes_on_error") or d_json.get("plan_errors_and_warnings")
+
+        if exec_summary_partial and isinstance(exec_summary_partial, str) and \
+           "Narrative generation failed" not in exec_summary_partial and \
+           "Process incomplete" not in exec_summary_partial:
+            md_error_render.append(f"**Partial Analysis (if available):**\n{exec_summary_partial}\n")
+        if debug_info_detail:
+            md_error_render.append(f"**Debug Info:** {debug_info_detail}\n")
+        if raw_response_detail:
+             md_error_render.append(f"**AI Response Snippet (from error context):**\n```\n{raw_response_detail}\n```\n")
+        
+        if isinstance(plan_exec_log, list) and plan_exec_log:
+            md_error_render.append(f"\n### {section_emojis['notes']} Plan Execution Log (during error):")
+            for note_item in plan_exec_log: 
+                if isinstance(note_item, dict):
+                    severity = note_item.get("severity", "LOG")
+                    step_info = note_item.get("step", "Unknown")
+                    msg_info = note_item.get("message", "No detail.")
+                    md_error_render.append(f"- **[{severity}] At '{step_info}':** {msg_info}")
+                else:
+                    md_error_render.append(f"- {str(note_item)}")
+            md_error_render.append("\n")
+        
+        # Footer for error report
+        md_error_render.append(f"\n---\n**A Hans Johannes Schulte Production for SPORTSΩmegaPRO²**")
+        md_error_render.append(f"\n*System: The Manna Maker Engine*")
+        md_error_render.append(f"\n*Generated on {datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC')}*")
+        return "\n".join(md_error_render)
+
+
+    # --- Main Dossier Rendering ---
+    md_render = []
+    sport_key_data = d_json.get('sport_key', 'generic_sport') 
+    sport_emoji_title = sport_emojis_map.get(sport_key_data, sport_emojis_map["generic_sport"]) 
     
-    baseline = d_json.get("baseline_data", {})
-    team_a_name = baseline.get("team_a_name_official", d_json.get("input", {}).get("team_a", "Team A"))
-    team_b_name = baseline.get("team_b_name_official", d_json.get("input", {}).get("team_b", "Team B"))
+    match_title_full = d_json.get('match_title','N/A') 
+    baseline_data = d_json.get("baseline_data", {})
+    team_a_name_title = baseline_data.get("team_a_name_official") 
+    team_b_name_title = baseline_data.get("team_b_name_official")
     
-    flag_a = get_flag(team_a_name, sport_key)
-    flag_b = get_flag(team_b_name, sport_key)
-    club_a = club_emojis_map.get(team_a_name, "")
-    club_b = club_emojis_map.get(team_b_name, "")
+    league_date_part_info = "" # Initialize
     
-    md.append(f"# {sport_emoji} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{club_a}{flag_a} {team_a_name} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_b}{flag_b} {team_b_name}")
-    md.append(f"### 🗓️ <small>{match_title}</small>\n")
+    # Refined parsing for team names if not in baseline_data, and for league/date
+    if not team_a_name_title or not team_b_name_title or match_title_full == 'N/A':
+        if match_title_full != 'N/A':
+            # Try to parse team names and league/date from match_title_full
+            match_title_regex = re.match(r"^(.*?)\s*vs\.?\s*(.*?)\s*(?:\((.*)\))?$", match_title_full, re.IGNORECASE)
+            if match_title_regex:
+                if not team_a_name_title: team_a_name_title = match_title_regex.group(1).strip()
+                if not team_b_name_title: team_b_name_title = match_title_regex.group(2).strip()
+                if match_title_regex.group(3): # If league/date part was captured
+                    league_date_info_raw = match_title_regex.group(3).strip()
+                    # Try to split league and date if possible (e.g. "League - Date")
+                    league_date_split = re.match(r"^(.*?)\s*-\s*(.*?)$", league_date_info_raw)
+                    if league_date_split:
+                        league_name_parsed = league_date_split.group(1).strip()
+                        date_parsed = league_date_split.group(2).strip()
+                        league_date_part_info = f"({league_name_parsed} - {date_parsed})"
+                    else:
+                        league_date_part_info = f"({league_date_info_raw})" # Use raw if no '-'
+            else: # Fallback if main regex fails
+                 if not team_a_name_title: team_a_name_title = "Team A"
+                 if not team_b_name_title: team_b_name_title = "Team B"
+                 if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("("):]
+                 else: league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
+        else: # If match_title_full is 'N/A'
+            if not team_a_name_title: team_a_name_title = "Team A"
+            if not team_b_name_title: team_b_name_title = "Team B"
+            league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
 
-    summary = d_json.get('executive_summary_narrative', '*Executive summary was not generated.*')
-    md.append(f"## {section_emojis['summary']} Executive Summary & Narrative\n{summary}\n")
 
-    teams = d_json.get("team_overviews", [])
-    if teams:
-        md.append(f"## {section_emojis['teams']} Team Overviews")
-        for team in teams:
-            team_name_current = team.get('team_name', 'N/A')
-            team_flag = get_flag(team_name_current, sport_key)
-            team_club = club_emojis_map.get(team_name_current, "")
-            md.append(f"\n### {team_club}{team_flag} {team_name_current}")
-            md.append(f"- **Status & Odds**: {team.get('status_and_odds','N/A')}")
-            md.append(f"- {status_emojis['motivation']} **Motivation**: {team.get('motivation','N/A')}")
-            md.append(f"- {status_emojis['dynamics']} **Recent Dynamics**: {team.get('recent_dynamics','N/A')}")
-            md.append(f"- **Valuation Summary**: {team.get('valuation_summary','N/A')}")
-            strengths = team.get("key_strengths", [])
-            concerns = team.get("key_concerns", [])
-            if strengths: md.append(f"- {status_emojis['strength']} **Key Strengths**: {'; '.join(strengths)}")
-            if concerns: md.append(f"- {status_emojis['concern']} **Key Concerns**: {'; '.join(concerns)}")
-
-    tactics = d_json.get('tactical_analysis_battlegrounds')
-    if tactics: md.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds\n{tactics}\n")
-
-    players = d_json.get("key_players_to_watch", [])
-    if players:
-        md.append(f"## {section_emojis['players']} Key Players to Watch")
-        for player in players:
-            p_team = player.get('team_name', 'N/A')
-            p_flag = get_flag(p_team, sport_key)
-            md.append(f"\n- ⭐ **{p_flag} {player.get('player_name', 'N/A')} ({p_team})**")
-
-    injuries = d_json.get("injury_report_impact", [])
-    if injuries:
-        md.append(f"\n## {section_emojis['injury']} Injury Report Impact")
-        for injury in injuries:
-            i_team = injury.get('team_name','N/A')
-            i_flag = get_flag(i_team, sport_key)
-            md.append(f"- **{i_flag} {injury.get('player_name','N/A')} ({i_team})**: {injury.get('impact_summary','...')}")
-
-    gems = d_json.get("game_changing_factors_hidden_gems",[])
-    if gems:
-        md.append(f"\n## {section_emojis['gems']} Hidden Gems & Game-Changing Factors")
-        for gem in gems:
-            md.append(f"\n- 💡 **{gem.get('factor_title','Gem')}:** {gem.get('detail_explanation','N/A')}")
-
-    alts = d_json.get("alternative_perspectives", [])
-    if alts:
-        md.append(f"\n\n## {section_emojis.get('alt_view', '🔄')} Alternative Viewpoints")
-        for i, alt in enumerate(alts, 1):
-            md.append(f"\n### Viewpoint {i}: {alt.get('viewpoint_focus', 'Alternative Angle')}")
-            md.append(f"\n{alt.get('alternative_narrative_summary', '')}")
-
-    pred = d_json.get("overall_prediction")
-    if pred:
-        md.append(f"\n## {section_emojis['prediction']} Final Prediction")
-        md.append(f"- {status_emojis['winner']} **Predicted Winner**: {pred.get('predicted_winner','N/A')}")
-        md.append(f"- {status_emojis['score']} **Illustrative Scoreline**: {pred.get('predicted_score_illustrative','N/A')}")
-        conf = pred.get("confidence_percentage_split")
-        if conf:
-            md.append(f"- {status_emojis['confidence']} **Win Probability:** {team_a_name} Win: {conf.get('team_a_win_percent')}% | {team_b_name} Win: {conf.get('team_b_win_percent')}%")
+    flag_a_icon = get_flag_or_sport_icon(team_a_name_title, sport_key_data)
+    flag_b_icon = get_flag_or_sport_icon(team_b_name_title, sport_key_data)
+    club_emoji_a_icon = club_emojis_map.get(team_a_name_title, "")
+    club_emoji_b_icon = club_emojis_map.get(team_b_name_title, "")
     
-    # ** FINAL, CORRECTED BRANDING **
-    md.append(f"\n\n---\nA Hans Johannes Schulte Production for **AIOS.ICU** (Artificial Intelligence Operating System Intelligence Connection Unit), igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution. Try a taste at [**aios.icu/generate_super_prompt**](https://aios.icu/generate_super_prompt), follow [@pastsmartlink](https://x.com/pastsmartlink) on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe!")
-    
-    ts_utc = datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC')
-    md.append(f"\n*Generated by the Manna Maker Cognitive OS, powered by AIOS.ICU, on {ts_utc}*")
+    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} <span style='color: #e74c3c; font-weight:bold;'>VS</span> {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
 
-    return "\n".join(md)
+    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier {section_emojis['spyglass']}<br>{teams_part_for_title}")
+    if league_date_part_info:
+        md_render.append(f"### 🗓️ <small>{league_date_part_info}</small>\n")
+    else:
+        md_render.append("\n")
+    
+    venue_info = baseline_data.get("venue_name_official", d_json.get("venue")) 
+    time_info_iso = baseline_data.get("commence_time_iso_official", d_json.get("input", {}).get("commence_time")) or d_json.get("commence_time_iso")
+
+    extra_header_info = []
+    if venue_info:
+        extra_header_info.append(f"**🏟️ Venue:** {venue_info}")
+    if time_info_iso:
+        try:
+            dt_obj = datetime.fromisoformat(str(time_info_iso).replace("Z", "+00:00"))
+            time_formatted = dt_obj.strftime('%B %d, %Y %I:%M %p %Z') # Format without UTC offset for cleaner look if already specified
+            extra_header_info.append(f"**⏱️ Kick-off:** {time_formatted}")
+        except (ValueError, TypeError) as e_time:
+            logger.warning(f"Could not parse dossier timestamp '{time_info_iso}': {e_time}")
+            extra_header_info.append(f"**⏱️ Kick-off:** {str(time_info_iso)}")
+    
+    if extra_header_info:
+        md_render.append(" \\\n".join(extra_header_info) + "\n---\n") # Using backslash for hard line break in Markdown
+    
+    exec_summary_render = d_json.get('executive_summary_narrative','*Executive summary not available or generation incomplete.*')
+    if exec_summary_render == "##PLACEHOLDER_FOR_STAGE_7_NARRATIVE##":
+        exec_summary_render = "*Executive summary narrative generation was incomplete.*"
+    md_render.append(f"## {section_emojis['summary']} Executive Summary & Narrative\n{exec_summary_render}\n")
+
+    team_overviews_data = d_json.get("team_overviews", []) 
+    if isinstance(team_overviews_data, list) and team_overviews_data:
+        md_render.append(f"## {section_emojis['teams']} Team Overviews")
+        for team_item in team_overviews_data: 
+            if not isinstance(team_item, dict): continue
+            team_name_val = team_item.get('team_name','N/A')
+            current_team_icon = get_flag_or_sport_icon(team_name_val, sport_key_data)
+            current_club_emoji = club_emojis_map.get(team_name_val, "")
+            md_render.append(f"\n### {current_club_emoji}{current_team_icon} {team_name_val}".replace("  "," ").strip())
+            
+            def get_val_or_placeholder(val_dict: Dict[str, Any], key: str, placeholder_texts: List[str], default_ph: str = "[Data Pending AI Derivation]") -> str:
+                item_val = val_dict.get(key)
+                if item_val is not None and isinstance(item_val, str) and any(ph_text in item_val for ph_text in placeholder_texts):
+                    return default_ph
+                return str(item_val) if item_val is not None else "N/A"
+
+            common_placeholders = ["[Derive", "##PLACEHOLDER", "Derived Strength", "Derived Concern"]
+            md_render.append(f"- **Status & Odds**: {team_item.get('status_and_odds','N/A')}")
+            md_render.append(f"- {status_emojis['motivation']} **Motivation**: {get_val_or_placeholder(team_item, 'motivation', common_placeholders)}")
+            md_render.append(f"- {status_emojis['dynamics']} **Recent Dynamics**: {get_val_or_placeholder(team_item, 'recent_dynamics', common_placeholders)}")
+            md_render.append(f"- **Valuation Summary**: {team_item.get('valuation_summary','N/A')}")
+            
+            strengths_list = team_item.get("key_strengths", []) 
+            if isinstance(strengths_list, list) and strengths_list and not all("Derived Strength" in str(s) for s in strengths_list): # Ensure s is str for "in"
+                md_render.append(f"- {status_emojis['strength']} **Key Strengths**: {'; '.join(map(str,strengths_list))}")
+            else:
+                md_render.append(f"- {status_emojis['strength']} **Key Strengths**: *[Pending Full AI Derivation]*")
+
+            concerns_list = team_item.get("key_concerns", []) 
+            if isinstance(concerns_list, list) and concerns_list and not all("Derived Concern" in str(c) for c in concerns_list): # Ensure c is str for "in"
+                md_render.append(f"- {status_emojis['concern']} **Key Concerns**: {'; '.join(map(str,concerns_list))}")
+            else:
+                md_render.append(f"- {status_emojis['concern']} **Key Concerns**: *[Pending Full AI Derivation]*")
+    
+    tactical_analysis_content_from_json = d_json.get('tactical_analysis_battlegrounds') # Use a distinct variable
+    if tactical_analysis_content_from_json and isinstance(tactical_analysis_content_from_json, str) and \
+       tactical_analysis_content_from_json != "##PLACEHOLDER_FOR_STAGE_7_NARRATIVE_TACTICAL_EXPANSION##":
+        # Check if it's genuinely different from summary, or if summary was a placeholder
+        is_summary_placeholder = exec_summary_render == "*Executive summary narrative generation was incomplete.*" or \
+                                 exec_summary_render == "*Executive summary not available or generation incomplete.*"
+        if tactical_analysis_content_from_json.strip() != exec_summary_render.strip() or is_summary_placeholder:
+            md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n{tactical_analysis_content_from_json}\n")
+        else: # It was identical to a non-placeholder summary
+            md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis section was a duplicate of the executive summary. Specific tactical content may be pending or was not distinctly generated.]*\n")
+    elif tactical_analysis_content_from_json: # It's a placeholder
+         md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis pending full AI derivation.]*\n")
+    else: # It's not present or None
+        md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis not available.]*\n")
+
+
+    key_players_data = d_json.get("key_players_to_watch", []) 
+    if isinstance(key_players_data, list) and key_players_data and not (len(key_players_data)==1 and isinstance(key_players_data[0],dict) and key_players_data[0].get("player_name")=="[PlayerName]"):
+        md_render.append(f"## {section_emojis['players']} Key Players to Watch")
+        for player_item in key_players_data: 
+            if not isinstance(player_item, dict) or player_item.get('player_name') == "[PlayerName]": continue
+            player_team_name = player_item.get('team_name','N/A')
+            player_icon = get_flag_or_sport_icon(player_team_name, sport_key_data)
+            player_club_emoji = club_emojis_map.get(player_team_name, "")
+            md_render.append(f"\n- ⭐ **{player_club_emoji}{player_icon} {player_item.get('player_name','N/A')} ({player_team_name})**".replace("  "," ").strip())
+            for key, prefix_text in [("narrative_insight", "Insight"), ("critical_role_detail", "Role"), ("dossier_insight_detail", "Dossier Detail")]:
+                val = player_item.get(key)
+                if val and isinstance(val, str) and val != "...": 
+                    md_render.append(f"  - *{prefix_text}*: {val}")
+            prop_obs = player_item.get('relevant_prop_observation')
+            if prop_obs not in ['N/A', None, '', '...']: 
+                md_render.append(f"  - *Prop Observation*: {prop_obs}")
+    
+    injury_data = d_json.get("injury_report_impact", [])
+    is_real_injury_info = False
+    if isinstance(injury_data, list) and injury_data:
+        first_injury = injury_data[0]
+        if isinstance(first_injury, dict) and \
+           not (len(injury_data) == 1 and 
+                (first_injury.get("player_name") == "[Player]" or 
+                 (first_injury.get("player_name") == "N/A" and 
+                  isinstance(first_injury.get("status"), str) and 
+                  "No significant" in first_injury.get("status","")))):
+            is_real_injury_info = True
+            
+    if is_real_injury_info:
+        md_render.append(f"\n## {section_emojis['injury']} Injury Report Impact")
+        for injury_item in injury_data:
+            if isinstance(injury_item,dict) and injury_item.get("player_name") != "[Player]" and injury_item.get("player_name") != "N/A":
+                injury_team_name = injury_item.get('team_name','[Team]')
+                injury_icon = get_flag_or_sport_icon(injury_team_name, sport_key_data)
+                injury_club_emoji = club_emojis_map.get(injury_team_name, "")
+                md_render.append(f"- **{injury_club_emoji}{injury_icon} {injury_item.get('player_name','N/A')} ({injury_team_name})**: Status: {injury_item.get('status','[Status]')}. Impact: {injury_item.get('impact_summary','...')}".replace("  "," ").strip())
+    elif isinstance(injury_data, list) and injury_data and isinstance(injury_data[0], dict) and injury_data[0].get("player_name") == "N/A":
+        md_render.append(f"\n## {section_emojis['injury']} Injury Report Impact")
+        md_render.append(f"- {injury_data[0].get('impact_summary', 'No significant injuries reported.')}")
+
+    gems_data = d_json.get("game_changing_factors_hidden_gems",[]) 
+    default_gem_texts = ["(No distinct hidden gems identified", "(Hidden gems data issue", "(Default: Hidden gems processing", "[Derive"]
+    is_real_gems_data = False
+    if isinstance(gems_data, list) and gems_data: 
+        for gem_item_check in gems_data: # Iterate through all gems to find at least one real one
+            if isinstance(gem_item_check, dict):
+                detail_text_check = gem_item_check.get("detail_explanation","")
+                if isinstance(detail_text_check, str) and not any(marker in detail_text_check for marker in default_gem_texts):
+                    is_real_gems_data = True
+                    break 
+            
+    if is_real_gems_data:
+        md_render.append(f"\n## {section_emojis['gems']} Game-Changing Factors & Hidden Gems")
+        for gem_item in gems_data: 
+             if isinstance(gem_item,dict):
+                 gem_title_text = gem_item.get('factor_title','Gem')
+                 gem_detail_text = gem_item.get('detail_explanation','N/A')
+                 # Filter out placeholder/default text for display
+                 if not isinstance(gem_detail_text, str) or gem_detail_text == "N/A" or any(dt in gem_detail_text for dt in default_gem_texts):
+                     continue 
+                 md_render.append(f"\n- 💡 **{gem_title_text}:** {gem_detail_text} (Impact: {gem_item.get('impact_on_game','[Derive Impact]')}, Basis: {gem_item.get('supporting_data_type','[Derive Data Type]')})")
+    elif gems_data: # If gems_data list exists but was filtered out, mention it
+        md_render.append(f"\n## {section_emojis['gems']} Game-Changing Factors & Hidden Gems\n*[No distinct hidden gems were identified, or data is pending derivation.]*\n")
+    
+    alt_perspectives = d_json.get("alternative_perspectives", [])
+    if isinstance(alt_perspectives, list) and alt_perspectives:
+        # Check if there's at least one valid perspective
+        has_valid_perspective = False
+        for persp_item_check in alt_perspectives:
+            if isinstance(persp_item_check, dict) and persp_item_check.get('viewpoint_focus', 'Alternative Angle') != 'Alternative Angle':
+                has_valid_perspective = True
+                break
+        
+        if has_valid_perspective:
+            md_render.append(f"\n\n## {section_emojis.get('alt_view', '🔄')} Alternative Analytical Viewpoints {section_emojis['spyglass']}")
+            for idx, persp_item in enumerate(alt_perspectives, 1):
+                if isinstance(persp_item, dict) and persp_item.get('viewpoint_focus', 'Alternative Angle') != 'Alternative Angle':
+                    md_render.append(f"\n### Viewpoint {idx}: {persp_item.get('viewpoint_focus')}")
+                    md_render.append(f"\n{persp_item.get('alternative_narrative_summary', '*No summary provided for this viewpoint.*')}")
+                    supporting_args = persp_item.get('supporting_gems_or_arguments', [])
+                    if isinstance(supporting_args, list) and supporting_args:
+                        md_render.append(f"\n  - **Key Supporting Arguments/Gems for this Viewpoint:**")
+                        for arg in supporting_args:
+                            md_render.append(f"    - {str(arg)}") 
+            md_render.append("\n") 
+
+    prediction_info = d_json.get("overall_prediction")
+    if isinstance(prediction_info, dict) and prediction_info.get("predicted_winner") not in ["[Winner/Draw]", None, ""]:
+        md_render.append(f"\n## {section_emojis['prediction']} Chief Scout's Final Prediction")
+        md_render.append(f"- {status_emojis['winner']} **Predicted Winner**: {prediction_info.get('predicted_winner','N/A')}")
+        md_render.append(f"- {status_emojis['score']} **Illustrative Scoreline**: {prediction_info.get('predicted_score_illustrative','[X-Y]')}")
+        
+        confidence_data = prediction_info.get("confidence_percentage_split")
+        if isinstance(confidence_data, dict) and ( (isinstance(confidence_data.get('team_a_win_percent'), (int, float)) and confidence_data.get('team_a_win_percent',0) > 0) or \
+                                                   (isinstance(confidence_data.get('team_b_win_percent'), (int, float)) and confidence_data.get('team_b_win_percent',0) > 0) or \
+                                                   (isinstance(confidence_data.get('draw_percent_if_applicable'), (int, float)) and confidence_data.get('draw_percent_if_applicable',0) > 0) ):
+            md_render.append(f"- {status_emojis['confidence']} **Win Probability Split:**")
+            
+            md_render.append(f"  - {club_emoji_a_icon}{flag_a_icon} {team_a_name_title} Win: {confidence_data.get('team_a_win_percent','N/A')}%".replace("  "," ").strip())
+            draw_percent_val = confidence_data.get('draw_percent_if_applicable', 0)
+            if draw_percent_val is not None and (isinstance(draw_percent_val, (int,float)) and draw_percent_val > 0): 
+                md_render.append(f"  - 🤝 Draw: {draw_percent_val}%") 
+            md_render.append(f"  - {club_emoji_b_icon}{flag_b_icon} {team_b_name_title} Win: {confidence_data.get('team_b_win_percent','N/A')}%".replace("  "," ").strip())
+
+        exec_summary_rat_text = d_json.get('executive_summary_narrative','') 
+        if not isinstance(exec_summary_rat_text, str): exec_summary_rat_text = ""
+        is_placeholder_summary = "##PLACEHOLDER" in exec_summary_rat_text or "incomplete" in exec_summary_rat_text or "failed" in exec_summary_rat_text
+        
+        if not is_placeholder_summary and '.' in exec_summary_rat_text:
+            first_sentence = exec_summary_rat_text.split('.')[0].strip() + '.'
+            if first_sentence and len(first_sentence) > 10 : 
+                md_render.append(f"- **Brief Rationale (Implied)**: {first_sentence}")
+
+    md_render.append(f"\n\n## {section_emojis.get('complex_view', '🤯')} The Ωmega Perspective: Embracing Complexity")
+    md_render.append(
+        "The Manna Maker Cognitive Factory’s 20-stage AGI revolution, is designed to explore multiple analytical pathways. "
+        "Different inputs or even the nuanced generative paths of our advanced AI can yield distinct, yet equally insightful, strategic "
+        "viewpoints on the same matchup. This dossier, including its primary analysis and any alternative perspectives presented, "
+        "showcases this capability, offering a richer, more comprehensive understanding than a single deterministic forecast."
+        "Try a taste at [**aios.icu/generate_super_prompt**](https://aios.icu/generate_super_prompt), follow [@pastsmartlink](https://x.com/pastsmartlink) on X, grab one of 20,000 exclusive ΩMEGA KEY Tokens, earn $250-$1,500/year, and dominate the $100M+ Manna universe! "
+    )
+
+    md_render.append(f"\n\n---\n")
+    md_render.append(f"**Hans Johannes Schulte** Production for **AIOS.ICU** (**A**rtificial **I**ntelligence **O**perating **S**ystem **I**ntelligence **C**onnection **U**nit), igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution.")
+    md_render.append(f"\n*System: The Manna Maker Engine*")
+    md_render.append(f"\n*Creator's Specializations: AI Pipeline Architect | Generative AI Solutions Developer | LLM Application Specialist | Automated Intelligence Systems Designer*")
+    
+    ts_utc_str = datetime.now(timezone.utc).strftime('%B %d, %Y %H:%M:%S UTC') 
+    prov_info = d_json.get("provenance", {})
+    if isinstance(prov_info, dict) and prov_info.get("generation_timestamp_utc"):
+        try: 
+            ts_from_prov = prov_info["generation_timestamp_utc"]
+            if isinstance(ts_from_prov, datetime):
+                dt_obj_prov = ts_from_prov.replace(tzinfo=timezone.utc) if ts_from_prov.tzinfo is None else ts_from_prov
+            else: 
+                dt_obj_prov = datetime.fromisoformat(str(ts_from_prov).replace("Z","+00:00"))
+            ts_utc_str = dt_obj_prov.strftime('%B %d, %Y %H:%M:%S UTC')
+        except Exception as e_ts: 
+            logger.warning(f"Could not parse provenance timestamp '{prov_info['generation_timestamp_utc']}': {e_ts}")
+            ts_utc_str = str(prov_info["generation_timestamp_utc"]) 
+    md_render.append(f"\n*Generated by SPORTSΩmegaPRO on {ts_utc_str}*")
+    
+    plan_log_final = d_json.get("plan_execution_notes") or d_json.get("plan_execution_notes_on_error") or d_json.get("plan_errors_and_warnings")
+    if isinstance(plan_log_final, list) and plan_log_final:
+        md_render.append(f"\n\n### {section_emojis['notes']} Plan Execution Notes:")
+        for item_note in plan_log_final:
+            if isinstance(item_note, dict):
+                md_render.append(f"- **[{item_note.get('severity','LOG')}] At '{item_note.get('step','?')}':** {item_note.get('message','?')}")
+            else:
+                md_render.append(f"- {str(item_note)}")
+                
+    return "\n".join(md_render)
