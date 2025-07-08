@@ -177,7 +177,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     # --- Main Dossier Rendering ---
     md_render = []
 
-    # 1. BEAUTIFUL TITLE SECTION WITH IMAGE, TEAMS, DATE, TIME, VENUE
+    # 1. TITLE SECTION WITH TEAMS, DATE, TIME, VENUE (IMAGE REMOVED)
     sport_key_data = d_json.get('sport_key', 'generic_sport')
     sport_emoji_title = sport_emojis_map.get(sport_key_data, sport_emojis_map["generic_sport"])
     match_title_full = d_json.get('match_title','N/A')
@@ -264,7 +264,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     else:
         info_line = None
 
-    # --- TITLE, IMAGE, MINI-INTRO ---
+    # --- TITLE AND MINI-INTRO (IMAGE REMOVED) ---
     md_render.append(prominent_title_line)
 
     if info_line:
@@ -272,8 +272,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     else:
         md_render.append("\n")
 
-    # Add the image with correct URL
-    md_render.append("![Match Visualization](https://raw.githubusercontent.com/PastSmartLink/pro/refs/heads/main/static/Manna_Maker_Cognitive.gif)\n")
+    # IMAGE LINE REMOVED AS REQUESTED
 
     extra_header_info = []
     if venue_info:
@@ -477,13 +476,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
             if first_sentence and len(first_sentence) > 10 :
                 md_render.append(f"- **Brief Rationale (Implied)**: {first_sentence}")
 
-    md_render.append(f"\n\n## {section_emojis.get('complex_view', '🤯')} The Ωmega Perspective: Embracing Complexity")
-    md_render.append(
-        "The Manna Maker Engine, powering SPORTSΩmegaPRO², is designed to explore multiple analytical pathways. "
-        "Different inputs or even the nuanced generative paths of our advanced AI can yield distinct, yet equally insightful, strategic "
-        "viewpoints on the same matchup. This dossier, including its primary analysis and any alternative perspectives presented, "
-        "showcases this capability, offering a richer, more comprehensive understanding than a single deterministic forecast."
-    )
+    # OMEGA PERSPECTIVE SECTION REMOVED AS REQUESTED
 
     md_render.append(f"\n\n---\n")
 
