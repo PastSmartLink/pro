@@ -158,6 +158,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     team_b_name_title = baseline_data.get("team_b_name_official")
     
     league_date_part_info = ""
+    league = ""
+    country = ""
+    date_str = ""
+
     if not team_a_name_title or not team_b_name_title or match_title_full == 'N/A':
         if match_title_full != 'N/A':
             match_title_regex = re.match(r"^(.*?)\s*vs\.?\s*(.*?)\s*(?:\((.*)\))?$", match_title_full, re.IGNORECASE)
@@ -168,38 +172,74 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
                     league_date_info_raw = match_title_regex.group(3).strip()
                     league_date_split = re.match(r"^(.*?)\s*-\s*(.*?)$", league_date_info_raw)
                     if league_date_split:
-                        league_name_parsed = league_date_split.group(1).strip()
-                        date_parsed = league_date_split.group(2).strip()
-                        league_date_part_info = f"({league_name_parsed} - {date_parsed})"
+                        league = league_date_split.group(1).strip()
+                        date_str = league_date_split.group(2).strip()
+                        league_date_part_info = f"{league} - {date_str}"
                     else:
-                        league_date_part_info = f"({league_date_info_raw})"
+                        league_date_part_info = f"{league_date_info_raw}"
             else:
                  if not team_a_name_title: team_a_name_title = "Team A"
                  if not team_b_name_title: team_b_name_title = "Team B"
-                 if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("("):]
-                 else: league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
+                 if "(" in match_title_full: league_date_part_info = match_title_full[match_title_full.find("(")+1:-1]
+                 else: league_date_part_info = f"{sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')}"
         else:
             if not team_a_name_title: team_a_name_title = "Team A"
             if not team_b_name_title: team_b_name_title = "Team B"
-            league_date_part_info = f"({sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')})"
+            league_date_part_info = f"{sport_emojis_map.get(sport_key_data, '')} {d_json.get('sport_key','Match Details')}"
+
+    # Extract country if possible
+    if league_date_part_info:
+        # Try to parse country from league name
+        for key, val in league_country_map.items():
+            if league and league.lower() in key.lower():
+                country = val
+                break
+        if not country and sport_key_data in league_country_map:
+            country = league_country_map[sport_key_data]
+    if not country:
+        country = baseline_data.get("country", "")
 
     flag_a_icon = get_flag_or_sport_icon(team_a_name_title, sport_key_data)
     flag_b_icon = get_flag_or_sport_icon(team_b_name_title, sport_key_data)
     club_emoji_a_icon = club_emojis_map.get(team_a_name_title, "")
     club_emoji_b_icon = club_emojis_map.get(team_b_name_title, "")
-    
-    # Combine dossier title and matchup for stronger visual impact
-    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} **VS** {club_emoji_b_icon}{flag_b_icon} {team_b_name_title}".replace("  ", " ").strip()
-    md_render.append(f"# {sport_emoji_title} Ωmega Scouting Dossier: {teams_part_for_title} {section_emojis['spyglass']}")
-    md_render.append(f"{'=' * (len(teams_part_for_title) + 10)}")  # Add underline for emphasis
-    if league_date_part_info:
-        md_render.append(f"### 🗓️ <small>{league_date_part_info}</small>\n")
-    else:
-        md_render.append("\n")
-    
+
+    # Venue and time
     venue_info = baseline_data.get("venue_name_official", d_json.get("venue")) 
     time_info_iso = baseline_data.get("commence_time_iso_official", d_json.get("input", {}).get("commence_time")) or d_json.get("commence_time_iso")
 
+    if time_info_iso:
+        try:
+            dt_obj = datetime.fromisoformat(str(time_info_iso).replace("Z", "+00:00"))
+            if dt_obj.tzinfo is None:
+                dt_obj = dt_obj.replace(tzinfo=timezone.utc)
+            date_str = dt_obj.strftime('%Y-%m-%d')
+        except (ValueError, TypeError):
+            date_str = str(time_info_iso)
+
+    # Compose new title line and info line
+    teams_part_for_title = f"{club_emoji_a_icon}{flag_a_icon} {team_a_name_title} **VS** {club_emoji_b_icon}{flag_b_icon} {team_b_name_title} {section_emojis['spyglass']}".replace("  ", " ").strip()
+    title_line = f"{sport_emoji_title} {teams_part_for_title}"
+    info_line = ""
+    info_pieces = []
+    if league or country or date_str:
+        info_pieces = []
+        if league: info_pieces.append(league)
+        if country: info_pieces.append(country)
+        if date_str: info_pieces.append(date_str)
+        info_line = f"🗓️ ({' - '.join(info_pieces)})"
+    elif league_date_part_info:
+        info_line = f"🗓️ ({league_date_part_info})"
+    else:
+        info_line = None
+
+    # Title
+    md_render.append(f"{title_line}")
+    if info_line:
+        md_render.append(f"{info_line}\n")
+    # No underline!
+
+    # Venue and time (if you want to keep them separately, add here)
     extra_header_info = []
     if venue_info:
         extra_header_info.append(f"**🏟️ Venue:** {venue_info}")
@@ -211,12 +251,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
             time_formatted = dt_obj.strftime('%B %d, %Y %I:%M %p UTC')
             extra_header_info.append(f"**⏱️ Kick-off:** {time_formatted}")
         except (ValueError, TypeError) as e_time:
-            logger.warning(f"Could not parse dossier timestamp '{time_info_iso}': {e_time}")
             extra_header_info.append(f"**⏱️ Kick-off:** {str(time_info_iso)}")
-    
     if extra_header_info:
         md_render.append(" \\\n".join(extra_header_info) + "\n---\n")
-    
+
     exec_summary_render = d_json.get('executive_summary_narrative','*Executive summary not available or generation incomplete.*')
     if exec_summary_render == "##PLACEHOLDER_FOR_STAGE_7_NARRATIVE##":
         exec_summary_render = "*Executive summary narrative generation was incomplete.*"
@@ -264,7 +302,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
         if tactical_analysis_content_from_json.strip() != exec_summary_render.strip() or is_summary_placeholder:
             md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n{tactical_analysis_content_from_json}\n")
         else:
-            md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis section was a duplicate of the executive summary. Specific tactical content may be pending or was not distinctly generated.]*\n")
+            md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis section was a duplicate of the executive summary. Specific tactical content may be pending.]*\n")
     elif tactical_analysis_content_from_json:
          md_render.append(f"\n## {section_emojis['tactics']} Tactical Battlegrounds & Game Flow\n*[Tactical analysis pending full AI derivation.]*\n")
     else:
@@ -306,7 +344,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
                 injury_team_name = injury_item.get('team_name','[Team]')
                 injury_icon = get_flag_or_sport_icon(injury_team_name, sport_key_data)
                 injury_club_emoji = club_emojis_map.get(injury_team_name, "")
-                md_render.append(f"- **{injury_club_emoji}{injury_icon} {injury_item.get('player_name','N/A')} ({injury_team_name})**: Status: {injury_item.get('status','[Status]')}. Impact: {injury_item.get('impact_summary','...')}".replace("  "," ").strip())
+                md_render.append(f"- **{injury_club_emoji}{injury_icon} {injury_item.get('player_name','N/A')} ({injury_team_name})**: Status: {injury_item.get('status','[Status]')}. Impact: {injury_item.get('impact','[Impact]')}")
     elif isinstance(injury_data, list) and injury_data and isinstance(injury_data[0], dict) and injury_data[0].get("player_name") == "N/A":
         md_render.append(f"\n## {section_emojis['injury']} Injury Report Impact")
         md_render.append(f"- {injury_data[0].get('impact_summary', 'No significant injuries reported.')}")
@@ -382,11 +420,10 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
             if first_sentence and len(first_sentence) > 10 : 
                 md_render.append(f"- **Brief Rationale (Implied)**: {first_sentence}")
 
-    md_render.append(f"\n\n## {section_emojis.get('complex_view', '🤯')} The Ωmega Perspective: Embracing Complexity")
+    # --- Ωmega Perspective section, per user request ---
+    md_render.append(f"\n\n## 🤯The Manna Maker Cognitive Factory’s 20-stage AGI revolution is designed to explore multiple analytical pathways.")
     md_render.append(
-        "The Manna Maker Cognitive Factory’s 20-stage AGI revolution is designed to explore multiple analytical pathways. "
-        "Different inputs or even the nuanced generative paths of our advanced AI can yield distinct, yet equally insightful, strategic "
-        "viewpoints on the same matchup."
+        "Different inputs or even the nuanced generative paths of our advanced AI can yield distinct, yet equally insightful, strategic viewpoints on the same matchup."
     )
     md_render.append(
         "This dossier, including its primary analysis and any alternative perspectives presented, showcases this capability, "
@@ -400,7 +437,7 @@ def _render_dossier_json_to_markdown(d_json: Dict[str, Any]) -> str:
     )
     md_render.append("\n---\n")
     md_render.append(
-        "**Hans Johannes Schulte** Production for **AIOS.ICU** (**A**rtificial **I**ntelligence **O**perating **S**ystem **I**ntelligence **C**onnection **U**nit), "
+        "A **Hans Johannes Schulte** Production for **AIOS.ICU** (Artificial Intelligence Operating System Intelligence Connection Unit), "
         "igniting the Manna Maker Cognitive Factory’s 20-stage AGI revolution."
     )
     md_render.append("\n**System**: The Manna Maker Engine")
